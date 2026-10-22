@@ -443,7 +443,10 @@ struct ContentView: View {
                     set: { model.setLaunchAtLogin($0) }))
                     .toggleStyle(.checkbox)
                 Spacer()
-                Text("mixer RAM is volatile")
+                Text(model.autoReapply
+                     ? "mix is re-applied automatically after power cycle"
+                     : "mixer RAM is volatile — re-apply after power cycle")
+                    .foregroundStyle(model.autoReapply ? Theme.secondary : .orange)
             }
             .font(.caption2).foregroundStyle(Theme.secondary)
         }

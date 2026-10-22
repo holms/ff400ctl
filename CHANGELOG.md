@@ -29,6 +29,10 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   hotkey scripts)
 
 ### Fixed
+- The footer's power-cycle note had been shortened to "mixer RAM is
+  volatile"; it now reflects the Auto re-apply setting ("re-applied
+  automatically after power cycle", or an orange "re-apply after power
+  cycle" reminder when it's off)
 - Dock/Cmd-Tab showed a generic icon for the detached window (stale
   LaunchServices cache) — the app now sets its icon explicitly at launch
 - Preamp (Mic 1/2, In 3/4) value labels were clipped to "0.0…" — the
