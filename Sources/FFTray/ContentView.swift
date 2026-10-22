@@ -1,33 +1,126 @@
 import SwiftUI
 import FFCore
 
-private let cellSize: CGFloat = 24
+private let cellSize: CGFloat = 26
+private let faderColW: CGFloat = 30
+private let faderTravel: CGFloat = 96
 private let labelWidth: CGFloat = 56
 
 /// ASFW "Studio Dark" palette.
 private enum Theme {
     static let bg        = Color(red: 0.070, green: 0.086, blue: 0.106)
-    static let card      = Color(red: 0.105, green: 0.140, blue: 0.165)
     static let text      = Color.white
     static let secondary = Color(red: 0.72, green: 0.78, blue: 0.84)
-    static let accent    = Color(red: 0.30, green: 0.62, blue: 0.94)
     static let inputOn   = Color(red: 0.22, green: 0.78, blue: 0.44)
     static let pbOn      = Color(red: 0.30, green: 0.62, blue: 0.94)
     static let offCell   = Color.white.opacity(0.07)
 }
 
+// MARK: - Reusable pieces
+
+/// A dB (or plain number) label you can click to type a new value.
+struct EditableValue: View {
+    let text: String
+    var width: CGFloat = 30
+    let onCommit: (String) -> Void
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        Group {
+            if editing {
+                TextField("", text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 9, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Theme.text)
+                    .focused($focused)
+                    .onSubmit { commit() }
+                    .onExitCommand { editing = false }
+                    .onChange(of: focused) { f in if !f { commit() } }
+            } else {
+                Text(text)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Theme.secondary)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        draft = text.replacingOccurrences(of: "dB", with: "")
+                            .replacingOccurrences(of: "−", with: "-")
+                            .replacingOccurrences(of: "∞", with: "-90")
+                            .trimmingCharacters(in: .whitespaces)
+                        editing = true
+                        focused = true
+                    }
+            }
+        }
+        .frame(width: width, height: 12)
+    }
+
+    private func commit() {
+        if editing { onCommit(draft) }
+        editing = false
+    }
+}
+
+/// One vertical fader column: travel slider + name + editable value.
+struct VFader: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double? = nil
+    let display: String
+    let onText: (String) -> Void
+
+    var body: some View {
+        VStack(spacing: 3) {
+            ZStack {
+                if let step {
+                    Slider(value: $value, in: range, step: step)
+                } else {
+                    Slider(value: $value, in: range)
+                }
+            }
+            .frame(width: faderTravel)
+            .rotationEffect(.degrees(-90))
+            .frame(width: faderColW - 6, height: faderTravel)
+
+            Text(title)
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(Theme.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            EditableValue(text: display, width: faderColW - 2, onCommit: onText)
+        }
+        .frame(width: faderColW)
+    }
+}
+
+private func fmtDB(_ db: Double) -> String {
+    if !db.isFinite { return "-∞" }
+    return String(format: "%.1f", db)
+}
+
+private func parseDB(_ s: String) -> Double? {
+    var t = s.trimmingCharacters(in: .whitespaces)
+        .replacingOccurrences(of: "db", with: "", options: .caseInsensitive)
+    t = t.replacingOccurrences(of: ",", with: ".")
+    return Double(t)
+}
+
+// MARK: - Main view
+
 struct ContentView: View {
     @EnvironmentObject private var model: MixerModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             header
             Picker("Matrix", selection: $model.matrixTab) {
                 Text("Inputs").tag(0)
                 Text("Playback").tag(1)
             }
             .pickerStyle(.segmented)
-            .labelsHidden()
 
             MatrixView(
                 cells: model.matrixTab == 0 ? model.input : model.playback,
@@ -38,12 +131,13 @@ struct ContentView: View {
                     else { model.togglePlayback(src: s, dest: d) }
                 })
 
-            outputFaders
-            inputGains
+            inputSendStrip
+            outputStrip
+            preampStrip
             footer
         }
         .padding(12)
-        .frame(width: 640)
+        .frame(width: 660)
         .background(Theme.bg)
         .colorScheme(.dark)
     }
@@ -66,56 +160,107 @@ struct ContentView: View {
         }
     }
 
-    private var outputFaders: some View {
+    /// INPUT send faders — each input's level into the selected monitor bus pair.
+    private var inputSendStrip: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("OUTPUT").font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
-            HStack(alignment: .top, spacing: 0) {
-                Spacer().frame(width: labelWidth)
-                ForEach(0..<Fireface400.channelCount, id: \.self) { ch in
-                    VStack(spacing: 2) {
-                        Slider(value: Binding(
-                            get: { Double(model.output[ch]) / Double(Fireface400.unityGain) },
-                            set: { model.setOutput(ch, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
-                        ), in: 0...2)
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 36, height: 14)
-                        .padding(.vertical, 11)
-                        Text(String(format: "%d", ch + 1))
-                            .font(.system(size: 7, design: .monospaced))
-                            .foregroundStyle(Theme.secondary)
+            HStack(spacing: 8) {
+                Text("INPUTS →")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
+                Picker("Bus", selection: $model.monitorBus) {
+                    ForEach(0..<busPairs.count, id: \.self) { i in
+                        Text(busPairs[i].name).tag(i)
                     }
-                    .frame(width: cellSize + 4)
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                Text("send level")
+                    .font(.caption2).foregroundStyle(Theme.secondary)
             }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 2) {
+                    ForEach(0..<Fireface400.channelCount, id: \.self) { src in
+                        VFader(
+                            title: "\(src + 1)",
+                            value: Binding(
+                                get: { Double(model.inputSend(src)) / Double(Fireface400.unityGain) },
+                                set: { model.setInputSend(src, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
+                            ),
+                            range: 0...2,
+                            display: fmtDB(model.inputSendDB(src)),
+                            onText: { t in
+                                if let db = parseDB(t) {
+                                    model.setInputSend(src, gain: Fireface400.gain(fromDB: db))
+                                }
+                            })
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            Text("row 1-4 = front jacks · 5-8 = rear line · 9-10 = SPDIF · 11-18 = ADAT")
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(Theme.secondary.opacity(0.7))
         }
     }
 
-    private var inputGains: some View {
-        HStack(spacing: 20) {
-            ForEach(0..<2, id: \.self) { i in
-                HStack {
-                    Text("Mic \(i + 1)")
-                        .font(.caption).foregroundStyle(Theme.secondary)
-                    Slider(value: Binding(
-                        get: { model.micGain[i] },
-                        set: { model.setMicGain(i, dB: $0) }
-                    ), in: 0...65, step: 1)
-                    Text(String(format: "%.0f dB", model.micGain[i]))
-                        .font(.caption.monospacedDigit()).foregroundStyle(Theme.text)
-                        .frame(width: 44)
+    /// Output master faders.
+    private var outputStrip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("OUTPUTS")
+                .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 2) {
+                    ForEach(0..<Fireface400.channelCount, id: \.self) { ch in
+                        VFader(
+                            title: "\(ch + 1)",
+                            value: Binding(
+                                get: { Double(model.output[ch]) / Double(Fireface400.unityGain) },
+                                set: { model.setOutput(ch, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
+                            ),
+                            range: 0...2,
+                            display: fmtDB(model.outputDB(ch)),
+                            onText: { t in
+                                if let db = parseDB(t) {
+                                    model.setOutput(ch, gain: Fireface400.gain(fromDB: db))
+                                }
+                            })
+                    }
                 }
+                .padding(.vertical, 2)
             }
-            ForEach(0..<2, id: \.self) { i in
-                HStack {
-                    Text("In \(i + 3)")
-                        .font(.caption).foregroundStyle(Theme.secondary)
-                    Slider(value: Binding(
-                        get: { model.inGain[i] },
-                        set: { model.setInGain(i, dB: $0) }
-                    ), in: -30...30, step: 0.5)
-                    Text(String(format: "%.1f", model.inGain[i]))
-                        .font(.caption.monospacedDigit()).foregroundStyle(Theme.text)
-                        .frame(width: 36)
+            Text("1-6 = analog · 7-8 = phones · 9-10 = SPDIF · 11-18 = ADAT")
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(Theme.secondary.opacity(0.7))
+        }
+    }
+
+    /// Hardware preamp gains — only inputs 1-4 have them on the FF400.
+    private var preampStrip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("PREAMP (hardware gain — inputs 1-4 only)")
+                .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(0..<2, id: \.self) { i in
+                    VFader(
+                        title: "Mic \(i + 1)",
+                        value: Binding(
+                            get: { model.micGain[i] },
+                            set: { model.setMicGain(i, dB: $0) }
+                        ),
+                        range: 0...65, step: 1,
+                        display: String(format: "%.0f dB", model.micGain[i]),
+                        onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } })
+                }
+                ForEach(0..<2, id: \.self) { i in
+                    VFader(
+                        title: "In \(i + 3)",
+                        value: Binding(
+                            get: { model.inGain[i] },
+                            set: { model.setInGain(i, dB: $0) }
+                        ),
+                        range: 0...30, step: 0.5,
+                        display: String(format: "%.1f dB", model.inGain[i]),
+                        onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } })
                 }
             }
         }
@@ -143,7 +288,6 @@ private struct MatrixView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            // column headers (output numbers)
             HStack(spacing: 2) {
                 Text("IN \\ OUT")
                     .font(.system(size: 8, design: .monospaced))
@@ -168,21 +312,12 @@ private struct MatrixView: View {
                         Button { onToggle(src, dest) } label: {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(on ? onColor : Theme.offCell)
-                                .frame(width: cellSize, height: 16)
+                                .frame(width: cellSize - 4, height: 18)
                         }
                         .buttonStyle(.plain)
                         .frame(width: cellSize)
                     }
                 }
-            }
-            // legend
-            HStack(spacing: 16) {
-                ForEach([0, 6, 8, 10], id: \.self) { i in
-                    Text("\(i + 1)=\(Fireface400.outputNames[i])")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(Theme.secondary)
-                }
-                Text("…10=SPDIF R, 11-18=ADAT").font(.system(size: 8, design: .monospaced)).foregroundStyle(Theme.secondary)
             }
         }
     }
