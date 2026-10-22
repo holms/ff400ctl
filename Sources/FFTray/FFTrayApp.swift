@@ -25,7 +25,7 @@ let busPairs: [(name: String, a: Int, b: Int)] = [
     ("ADAT 5/6", 14, 15), ("ADAT 7/8", 16, 17),
 ]
 
-final class MixerModel: ObservableObject {
+final class MixerModel: NSObject, ObservableObject {
     @Published var connected = false
     @Published var lastError: String?
     @Published var matrixTab = 0          // 0 = inputs, 1 = playback
@@ -48,11 +48,12 @@ final class MixerModel: ObservableObject {
     private var ctl: FirefaceController?
     private let hwq = WriteCoalescer()
 
-    init() {
+    override init() {
         let s = MixerState.load()
         input = s.input
         playback = s.playback
         output = s.output
+        super.init()
         do {
             let c = try FirefaceController()
             ctl = c
@@ -75,11 +76,21 @@ final class MixerModel: ObservableObject {
         } catch {
             lastError = "\(error)"
         }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(appWillTerminate),
+            name: NSApplication.willTerminateNotification, object: nil)
+    }
+
+    /// Flush pending writes and persist state before the process exits.
+    @objc private func appWillTerminate(_ note: Notification) {
+        hwq.waitUntilIdle()
+        ctl?.saveState()
     }
 
     /// Run a hardware operation on the serial write queue; report failure
     /// back on the main thread. UI state is updated optimistically by the
-    /// caller so faders stay responsive while transactions drain.
+    /// caller so faders stay responsive while transactions drain. State is
+    /// auto-saved (coalesced) after each change.
     private func hw(_ key: String, _ failMsg: String = "write failed",
                     _ work: @escaping (FirefaceController) -> Bool) {
         hwq.submit(key) { [weak self] in
@@ -87,6 +98,7 @@ final class MixerModel: ObservableObject {
             if !work(c) {
                 DispatchQueue.main.async { self.lastError = failMsg }
             }
+            self.hwq.submit("save") { c.saveState() }
         }
     }
 

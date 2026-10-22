@@ -19,6 +19,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   left stale solo-silenced cells on the old pair while the new pair was
   unsilenced — new `setBusPair` runs on the queue and rewrites affected
   cells
+- Tray app only persisted state via "Save state"; every hw write now
+  submits a coalesced save and `willTerminate` flushes + saves
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)
