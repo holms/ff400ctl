@@ -5,6 +5,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- Auto re-apply: FFTray watches the CoreAudio device list and re-pushes
+  the saved mix when the FF400 reappears after a power cycle (footer
+  toggle "Auto re-apply", on by default; new `DevicePresence` in FFCore)
 - "Launch at login" footer toggle in FFTray (SMAppService, macOS 13+)
 - FFTray app icon (RME Fireface 400 artwork, bundled as AppIcon.icns;
   the menu-bar item keeps its SF Symbol)

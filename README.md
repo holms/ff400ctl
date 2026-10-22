@@ -71,6 +71,10 @@ Menu-bar slider icon → click:
   All four write the 3-quadlet device config block at `0x80100514`.
 - **Launch at login** — footer toggle registers/unregisters the app as
   a login item (SMAppService, macOS 13+).
+- **Auto re-apply** — a CoreAudio device-list watcher notices when the
+  FF400 reappears after a power cycle and pushes the saved mix again
+  (mixer RAM is volatile); footer toggle, on by default. Relies on ASFW
+  republishing the CoreAudio device when the unit returns.
 - **Re-apply mix** — rewrites all tracked cells (mixer RAM is volatile —
   the unit restores its flash-stored mix on every power cycle); output
   amp gains are re-derived from the faders rather than replayed raw.

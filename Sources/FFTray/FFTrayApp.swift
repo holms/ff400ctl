@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import OSLog
 import ServiceManagement
+import CoreAudio
 import FFCore
 
 private let trayLog = Logger(subsystem: "net.holms.fftray", category: "ui")
@@ -92,6 +93,12 @@ final class MixerModel: NSObject, ObservableObject {
     @Published var monoBus = false
     /// Mirrors SMAppService.mainApp.status; re-read after every toggle.
     @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
+    /// Re-apply the saved mix when the FF400 reappears after a power
+    /// cycle (mixer RAM is volatile). Persisted in UserDefaults.
+    @Published var autoReapply =
+        UserDefaults.standard.object(forKey: "autoReapply") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(autoReapply, forKey: "autoReapply") }
+    }
 
     private var ctl: FirefaceController?
     private let hwq = WriteCoalescer()
@@ -108,6 +115,9 @@ final class MixerModel: NSObject, ObservableObject {
     /// Called when the detached window opens — AppDelegate closes the
     /// popover so the mixer isn't shown in two places.
     var onDetach: (() -> Void)?
+    /// CoreAudio device-list listener + edge detector for auto re-apply.
+    private var deviceListenerBlock: AudioObjectPropertyListenerBlock?
+    private var presenceTracker: DevicePresence.Tracker?
 
     override init() {
         let s = MixerState.load()
@@ -127,6 +137,7 @@ final class MixerModel: NSObject, ObservableObject {
             lastError = "\(error)"
         }
         watchStateFile()
+        watchDevicePresence()
         NotificationCenter.default.addObserver(
             self, selector: #selector(appWillTerminate),
             name: NSApplication.willTerminateNotification, object: nil)
@@ -134,6 +145,64 @@ final class MixerModel: NSObject, ObservableObject {
 
     deinit {
         stateWatcher?.cancel()
+        if let block = deviceListenerBlock {
+            var addr = Self.devicesAddress
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject), &addr,
+                DispatchQueue.main, block)
+        }
+    }
+
+    private static var devicesAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+    }
+
+    /// True when any CoreAudio device name matches the Fireface 400.
+    private static func firefacePresent() -> Bool {
+        var addr = devicesAddress
+        let sys = AudioObjectID(kAudioObjectSystemObject)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(sys, &addr, 0, nil, &size) == noErr
+        else { return false }
+        var ids = [AudioDeviceID](repeating: 0,
+                                count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(sys, &addr, 0, nil, &size, &ids) == noErr
+        else { return false }
+        var nameAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        for id in ids {
+            var name: CFString = "" as CFString
+            var ns = UInt32(MemoryLayout<CFString>.size)
+            if AudioObjectGetPropertyData(id, &nameAddr, 0, nil, &ns, &name) == noErr,
+               DevicePresence.isFireface400(name: name as String) { return true }
+        }
+        return false
+    }
+
+    /// Watch the CoreAudio device list; an absent→present edge on the
+    /// FF400 means a power cycle wiped the mixer RAM, so re-apply (after
+    /// a short settle delay) when autoReapply is on.
+    private func watchDevicePresence() {
+        presenceTracker = DevicePresence.Tracker(present: Self.firefacePresent())
+        var addr = Self.devicesAddress
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self else { return }
+            guard self.presenceTracker?.update(present: Self.firefacePresent()) == true,
+                  self.autoReapply else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                guard let self else { return }
+                self.applyAll()
+                trayLog.notice("FF400 reappeared — re-applied mix")
+            }
+        }
+        deviceListenerBlock = block
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &addr, DispatchQueue.main, block)
     }
 
     /// Register/unregister FFTray as a login item (macOS 13+ SMAppService).

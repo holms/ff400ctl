@@ -573,5 +573,23 @@ do {
     check(FFVersion.string.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression) != nil,
           "FFVersion.string is semver")
 }
+
+// MARK: - DevicePresence
+
+do {
+    check(DevicePresence.isFireface400(name: "RME Fireface 400 — ASFW"),
+          "FF400 name matched")
+    check(!DevicePresence.isFireface400(name: "Fireface 800"),
+          "Fireface 800 not matched")
+    check(!DevicePresence.isFireface400(name: "MacBook Pro Speakers"),
+          "speakers not matched")
+
+    var t = DevicePresence.Tracker(present: true)
+    check(!t.update(present: true), "present at launch: no edge")
+    t = DevicePresence.Tracker(present: true)
+    _ = t.update(present: false)
+    check(t.update(present: true), "absent->present edge fires")
+    check(!t.update(present: true), "repeated present: no edge")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)
