@@ -43,6 +43,11 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   (indices 4–21) saved before the encoding fix re-corrupted the fader↔amp
   mapping. Re-apply now goes through `setOutputFader` which re-derives
   each output amp gain; only input gains 0–3 are replayed
+- MONO was destructive (copied L cells into stored R; off couldn't
+  restore; playback excluded). It's now a true TotalMix-style L+R sum —
+  both monitor-pair cells carry the (L+R)/2 average for inputs and
+  playback, computed in the effective-value path with stored cells
+  untouched; `mono off` restores the exact stereo image
 
 ### Added
 - **Detach** button: opens the mixer in a normal titled window that stays

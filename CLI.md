@@ -68,7 +68,7 @@ ffctl mute <in> <on|off>     # mute input row on ALL outputs (fader kept)
 ffctl solo <in> <on|off>     # exclusive solo on the monitor bus pair
 ffctl phase <in> <on|off>    # phase invert (writes negative cell gain)
 ffctl outmute <ch> <on|off>  # mute output master fader + amp gain
-ffctl mono <on|off>          # lock the monitor bus pair L=R
+ffctl mono <on|off>          # mono-sum the monitor bus pair (L+R)/2 on both
 ffctl stereo <pair> <on|off> # stereo-link an output pair (0-8:
                              # 0=AN1/2, 1=AN3/4, 2=AN5/6, 3=PHONES,
                              # 4=SPDIF, 5-8=ADAT pairs)
@@ -82,6 +82,11 @@ ffctl stereo <pair> <on|off> # stereo-link an output pair (0-8:
   monitor bus pair only** (AN1/2). Other outputs are untouched.
 - `phase` writes the negative of the fader (FFADO convention). On a 0
   cell it writes −1 to avoid the hardware's transient level bump.
+- `mono` sums the monitor bus pair to mono: both cells carry the (L+R)/2
+  average for inputs **and** playback (Mac audio follows the monitor too).
+  Stored fader values are never modified — `mono off` restores the
+  stereo image exactly. The tray app watches `state.json`, so flag
+  changes made here are reflected in the UI live.
 
 ### Hardware gains
 

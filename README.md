@@ -55,7 +55,8 @@ Menu-bar slider icon → click:
   11–18 = ADAT). Click a cell to toggle the crosspoint between mute and 0 dB.
 - **INPUTS → bus** — per-input send faders into the selected monitor-bus
   pair, with **M** (mute), **S** (exclusive solo) and **Ø** (phase invert)
-  chips per channel, and a **MONO** lock for the pair.
+  chips per channel, and a **MONO** switch that sums the pair to (L+R)/2
+  (inputs and playback, non-destructive).
 - **OUTPUTS** — 18 master faders in stereo pairs with per-channel **M**
   (they also sync the FF400's hardware amp-gain register, like TotalMix
   does). The **ST** chip links a pair into one fader — TotalMix's stereo
@@ -112,7 +113,10 @@ Encoding ported from FFADO `set_hardware_params` / ASFW `EncodeConfig`.
 **Channel flags** (TotalMix semantics, software-side like FFADO):
 mute writes 0 but keeps the tracked fader value; phase invert writes the
 *negative* of the gain (with FFADO's `0 → -1` glitch workaround); solo is
-exclusive and applies to the monitor bus pair only; mono mirrors L→R cells.
+exclusive and applies to the monitor bus pair only; mono is a true L+R
+sum — both cells of the monitor pair carry the (L+R)/2 average (inputs
+and playback), and it's non-destructive: stored cells are never modified,
+so switching mono off restores the original stereo image.
 
 **Matrix addressing** (FF400, `block = 0x48`):
 

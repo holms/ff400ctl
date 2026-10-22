@@ -213,15 +213,22 @@ do {
     _ = ctl3.setInputSolo(src: 1, on: true)
     check(ctl3.state.inputSolo[1] && !ctl3.state.inputSolo[2], "solo is exclusive")
 
-    // mono: mirrors L cell into R on the bus pair
+    // mono: L+R average written to both pair cells, stored cells untouched
     let ctl4 = FirefaceController(testing: MixerState(), sink: sink)
-    _ = ctl4.setInputFader(src: 4, dest: 0, gain: 0x4000)
+    _ = ctl4.setInputFader(src: 4, dest: 0, gain: 0x8000)
     _ = ctl4.setInputFader(src: 4, dest: 1, gain: 0)
     _ = ctl4.setMonoBus(on: true)
-    eq(ctl4.state.input[MixerState.index(src: 4, dest: 1)], 0x4000,
-       "mono mirrors L cell into R")
+    let c40 = Fireface400.mixAddress(kind: .input, src: 4, dest: 0)!
     let c41 = Fireface400.mixAddress(kind: .input, src: 4, dest: 1)!
-    eq(writes.last(where: { $0.0 == c41 })!.1, 0x4000, "mono writes R cell")
+    eq(writes.last(where: { $0.0 == c40 })!.1, 0x4000, "mono averages L cell")
+    eq(writes.last(where: { $0.0 == c41 })!.1, 0x4000, "mono averages R cell")
+    eq(ctl4.state.input[MixerState.index(src: 4, dest: 0)], 0x8000,
+       "mono leaves stored L untouched")
+    eq(ctl4.state.input[MixerState.index(src: 4, dest: 1)], 0,
+       "mono leaves stored R untouched")
+    _ = ctl4.setMonoBus(on: false)
+    eq(writes.last(where: { $0.0 == c40 })!.1, 0x8000, "mono off restores L")
+    eq(writes.last(where: { $0.0 == c41 })!.1, 0, "mono off restores R")
 
     // output mute: fader + amp gain muted, fader value kept
     let ctl5 = FirefaceController(testing: MixerState(), sink: sink)
@@ -401,6 +408,81 @@ do {
     over.outputMute = [Bool](repeating: true, count: 30)
     eq(over.normalized().outputMute.count, 18, "outputMute truncated to 18")
 }
+// MARK: - Mono sum semantics (inputs + playback, non-destructive)
+
+do {
+    var w: [(UInt32, UInt32)] = []
+    let sink: (UInt32, UInt32) -> Bool = { a, v in w.append((a, v)); return true }
+    func last(_ addr: UInt32) -> UInt32 { w.last(where: { $0.0 == addr })!.1 }
+
+    // playback sources average too
+    let c = FirefaceController(testing: MixerState(), sink: sink)
+    _ = c.setPlaybackFader(src: 7, dest: 0, gain: 0x8000)
+    _ = c.setPlaybackFader(src: 7, dest: 1, gain: 0x2000)
+    _ = c.setMonoBus(on: true)
+    let p70 = Fireface400.mixAddress(kind: .playback, src: 7, dest: 0)!
+    let p71 = Fireface400.mixAddress(kind: .playback, src: 7, dest: 1)!
+    eq(last(p70), 0x5000, "mono averages playback L")
+    eq(last(p71), 0x5000, "mono averages playback R")
+    eq(c.state.playback[MixerState.index(src: 7, dest: 0)], 0x8000,
+       "stored playback L untouched")
+    _ = c.setMonoBus(on: false)
+    eq(last(p70), 0x8000, "mono off restores playback L")
+    eq(last(p71), 0x2000, "mono off restores playback R")
+
+    // mono + phase: average computed, then negated
+    let c2 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = c2.setInputFader(src: 4, dest: 0, gain: 0x8000)
+    _ = c2.setInputFader(src: 4, dest: 1, gain: 0)
+    _ = c2.setInputPhase(src: 4, on: true)
+    _ = c2.setMonoBus(on: true)
+    let i40 = Fireface400.mixAddress(kind: .input, src: 4, dest: 0)!
+    let i41 = Fireface400.mixAddress(kind: .input, src: 4, dest: 1)!
+    eq(last(i40), UInt32(bitPattern: Int32(-0x4000)), "mono+phase negates avg L")
+    eq(last(i41), UInt32(bitPattern: Int32(-0x4000)), "mono+phase negates avg R")
+
+    // editing one pair cell while mono is on rewrites BOTH pair cells
+    let c3 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = c3.setInputFader(src: 4, dest: 0, gain: 0x8000)
+    _ = c3.setInputFader(src: 4, dest: 1, gain: 0)
+    _ = c3.setMonoBus(on: true)
+    _ = c3.setInputFader(src: 4, dest: 1, gain: 0x4000)
+    eq(last(i40), 0x6000, "fader edit under mono rewrites L with new avg")
+    eq(last(i41), 0x6000, "fader edit under mono rewrites R with new avg")
+
+    // same for playback faders
+    let c4 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = c4.setPlaybackFader(src: 2, dest: 0, gain: 0x8000)
+    _ = c4.setPlaybackFader(src: 2, dest: 1, gain: 0)
+    _ = c4.setMonoBus(on: true)
+    _ = c4.setPlaybackFader(src: 2, dest: 1, gain: 0x8000)
+    let p20 = Fireface400.mixAddress(kind: .playback, src: 2, dest: 0)!
+    eq(last(p20), 0x8000, "pb fader edit under mono rewrites sibling")
+
+    // bus change with mono on: old pair restored, new pair averaged
+    let c5 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = c5.setInputFader(src: 4, dest: 0, gain: 0x8000)
+    _ = c5.setInputFader(src: 4, dest: 1, gain: 0)
+    _ = c5.setInputFader(src: 4, dest: 2, gain: 0x8000)
+    _ = c5.setInputFader(src: 4, dest: 3, gain: 0)
+    _ = c5.setMonoBus(on: true)
+    _ = c5.setBusPair(a: 2, b: 3)
+    let i42 = Fireface400.mixAddress(kind: .input, src: 4, dest: 2)!
+    eq(last(i40), 0x8000, "mono bus change restores old L")
+    eq(last(i41), 0, "mono bus change restores old R")
+    eq(last(i42), 0x4000, "mono bus change averages new pair")
+
+    // applyAll writes effective playback values (mono still on, pair 2/3)
+    _ = c5.setPlaybackFader(src: 4, dest: 2, gain: 0x8000)
+    _ = c5.setPlaybackFader(src: 4, dest: 3, gain: 0)
+    _ = c5.applyAll()
+    let p40 = Fireface400.mixAddress(kind: .playback, src: 4, dest: 0)!
+    eq(last(p40), c5.state.playback[MixerState.index(src: 4, dest: 0)],
+       "applyAll writes stored playback off-pair")
+    eq(last(Fireface400.mixAddress(kind: .playback, src: 4, dest: 2)!), 0x4000,
+       "applyAll writes averaged playback on-pair")
+}
+
 // MARK: - applyAll re-derives output amp gains (stale 2x values dropped)
 
 do {

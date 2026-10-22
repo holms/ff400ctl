@@ -152,14 +152,7 @@ final class MixerModel: NSObject, ObservableObject {
 
     func setMono(_ on: Bool) {
         monoBus = on
-        hw("mono") { c in
-            let ok = c.setMonoBus(on: on)
-            if ok, on {
-                let cells = c.state.input
-                DispatchQueue.main.async { self.input = cells }
-            }
-            return ok
-        }
+        hw("mono") { c in c.setMonoBus(on: on) }
     }
 
     func inputSendDB(_ src: Int) -> Double {

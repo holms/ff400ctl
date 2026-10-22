@@ -53,14 +53,26 @@ public final class FirefaceController {
     public func setInputFader(src: Int, dest: Int, gain: UInt32) -> Bool {
         guard Fireface400.mixAddress(kind: .input, src: src, dest: dest) != nil else { return false }
         state.input[MixerState.index(src: src, dest: dest)] = gain
-        return writeInputCell(src: src, dest: dest)
+        var ok = writeInputCell(src: src, dest: dest)
+        // See setPlaybackFader: the mono average covers both pair cells.
+        if ok, state.monoBus, dest == busPair.a || dest == busPair.b {
+            let other = dest == busPair.a ? busPair.b : busPair.a
+            ok = writeInputCell(src: src, dest: other) && ok
+        }
+        return ok
     }
 
     @discardableResult
     public func setPlaybackFader(src: Int, dest: Int, gain: UInt32) -> Bool {
-        guard let addr = Fireface400.mixAddress(kind: .playback, src: src, dest: dest) else { return false }
-        let ok = write(addr, gain)
-        if ok { state.playback[MixerState.index(src: src, dest: dest)] = gain }
+        guard Fireface400.mixAddress(kind: .playback, src: src, dest: dest) != nil else { return false }
+        state.playback[MixerState.index(src: src, dest: dest)] = gain
+        var ok = writePlaybackCell(src: src, dest: dest)
+        // A mono-averaged pair cell shares its base with the sibling —
+        // the average changed, so rewrite the other cell too.
+        if ok, state.monoBus, dest == busPair.a || dest == busPair.b {
+            let other = dest == busPair.a ? busPair.b : busPair.a
+            ok = writePlaybackCell(src: src, dest: other) && ok
+        }
         return ok
     }
 
@@ -180,10 +192,23 @@ extension FirefaceController {
 
 extension FirefaceController {
 
-    /// Signed value actually written to an input matrix cell, honoring
-    /// mute, solo (on the bus pair only) and phase flags.
+    /// Mono base value for an input cell: when the monitor pair is
+    /// mono-locked, both cells of the pair carry the (L + R)/2 average of
+    /// the *stored* values — a true sum like TotalMix's mono, without
+    /// destroying the stored stereo image. Center-panned sources (L == R)
+    /// are unchanged.
+    private func monoBaseInput(src: Int, dest: Int) -> UInt32 {
+        let v = state.input[MixerState.index(src: src, dest: dest)]
+        guard state.monoBus, dest == busPair.a || dest == busPair.b else { return v }
+        let l = state.input[MixerState.index(src: src, dest: busPair.a)]
+        let r = state.input[MixerState.index(src: src, dest: busPair.b)]
+        return UInt32((UInt64(l) + UInt64(r)) / 2)
+    }
+
+    /// Signed value actually written to an input matrix cell: mono base,
+    /// then mute, then solo (on the bus pair only), then phase.
     public func effectiveInputCell(src: Int, dest: Int) -> Int32 {
-        var v = Int32(bitPattern: state.input[MixerState.index(src: src, dest: dest)])
+        var v = Int32(bitPattern: monoBaseInput(src: src, dest: dest))
         if state.inputMute[src] { v = 0 }
         let anySolo = state.inputSolo.contains(true)
         if anySolo && !state.inputSolo[src] && (dest == busPair.a || dest == busPair.b) { v = 0 }
@@ -196,9 +221,25 @@ extension FirefaceController {
         return v
     }
 
+    /// Effective value for a playback cell: mono average on the bus pair
+    /// (Mac audio follows the monitor pair too). No per-row flags for
+    /// playback channels.
+    public func effectivePlaybackCell(src: Int, dest: Int) -> UInt32 {
+        let v = state.playback[MixerState.index(src: src, dest: dest)]
+        guard state.monoBus, dest == busPair.a || dest == busPair.b else { return v }
+        let l = state.playback[MixerState.index(src: src, dest: busPair.a)]
+        let r = state.playback[MixerState.index(src: src, dest: busPair.b)]
+        return UInt32((UInt64(l) + UInt64(r)) / 2)
+    }
+
     private func writeInputCell(src: Int, dest: Int) -> Bool {
         guard let addr = Fireface400.mixAddress(kind: .input, src: src, dest: dest) else { return false }
         return write(addr, UInt32(bitPattern: effectiveInputCell(src: src, dest: dest)))
+    }
+
+    private func writePlaybackCell(src: Int, dest: Int) -> Bool {
+        guard let addr = Fireface400.mixAddress(kind: .playback, src: src, dest: dest) else { return false }
+        return write(addr, effectivePlaybackCell(src: src, dest: dest))
     }
 
     /// Rewrite all cells of one input row (18 writes).
@@ -249,30 +290,40 @@ extension FirefaceController {
               (0..<Fireface400.channelCount).contains(b) else { return false }
         let old = busPair
         busPair = (a, b)
-        guard state.inputSolo.contains(true) else { return true }
+        let solo = state.inputSolo.contains(true)
+        guard solo || state.monoBus else { return true }
         var ok = true
         for s in 0..<Fireface400.channelCount {
-            // Rewrite with the NEW pair so effectiveInputCell evaluates
-            // correctly for both the old dests (restore) and the new.
+            // Rewrite with the NEW pair so the effective-value functions
+            // evaluate correctly for both the old dests (restore) and the
+            // new (solo-silence / mono-average).
             if !writeInputCell(src: s, dest: old.a) { ok = false }
             if !writeInputCell(src: s, dest: old.b) { ok = false }
             if !writeInputCell(src: s, dest: a) { ok = false }
             if !writeInputCell(src: s, dest: b) { ok = false }
+            if state.monoBus {
+                if !writePlaybackCell(src: s, dest: old.a) { ok = false }
+                if !writePlaybackCell(src: s, dest: old.b) { ok = false }
+                if !writePlaybackCell(src: s, dest: a) { ok = false }
+                if !writePlaybackCell(src: s, dest: b) { ok = false }
+            }
         }
         return ok
     }
 
-    /// Mono-lock the monitor bus pair: mirror the left cell values into the
-    /// right for every input, so both outputs carry the same mix.
+    /// Mono-lock the monitor bus pair (TotalMix-style): both pair cells
+    /// carry the (L + R)/2 average of the stored values, for inputs and
+    /// playback. Non-destructive — stored cells are never modified, so
+    /// switching mono off restores the original stereo image.
     @discardableResult
     public func setMonoBus(on: Bool) -> Bool {
         state.monoBus = on
-        guard on else { return true }      // off just stops enforcing
         var ok = true
         for s in 0..<Fireface400.channelCount {
-            let l = state.input[MixerState.index(src: s, dest: busPair.a)]
-            state.input[MixerState.index(src: s, dest: busPair.b)] = l
+            if !writeInputCell(src: s, dest: busPair.a) { ok = false }
             if !writeInputCell(src: s, dest: busPair.b) { ok = false }
+            if !writePlaybackCell(src: s, dest: busPair.a) { ok = false }
+            if !writePlaybackCell(src: s, dest: busPair.b) { ok = false }
         }
         return ok
     }
