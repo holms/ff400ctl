@@ -1,5 +1,6 @@
 import Foundation
 @testable import FFCore
+@testable import FFModel
 
 // Minimal test harness (no XCTest dependency — runs under Command Line Tools).
 var failures = 0
@@ -577,6 +578,122 @@ do {
     }
     eq(Fireface400.mainSliderPos(0), 0, "gain 0 -> pos 0")
     eq(Fireface400.mainSliderPos(Fireface400.gain(fromDB: 10)), 1, ">=+6dB -> pos 1")
+}
+
+// MARK: - MixerModel (UI actions -> device writes, fake hardware)
+
+do {
+    var w: [(UInt32, UInt32)] = []
+    let sink: (UInt32, UInt32) -> Bool = { a, v in w.append((a, v)); return true }
+    func last(_ addr: UInt32) -> UInt32? { w.last(where: { $0.0 == addr })?.1 }
+    func makeModel(_ state: MixerState = MixerState()) -> MixerModel {
+        MixerModel(testing: FirefaceController(testing: state, sink: sink))
+    }
+    // let @Published / lastError dispatches to main land
+    func pump(_ s: Double = 0.1) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+
+    // send fader writes BOTH cells of the monitor bus pair
+    let m = makeModel()
+    m.setInputSend(3, gain: 0x8000)
+    m.flush()
+    eq(last(Fireface400.mixAddress(kind: .input, src: 3, dest: 0)!)!, 0x8000,
+       "UI send writes bus cell L")
+    eq(last(Fireface400.mixAddress(kind: .input, src: 3, dest: 1)!)!, 0x8000,
+       "UI send writes bus cell R")
+    eq(m.input[3 * 18 + 0], 0x8000, "UI send updates published L")
+    eq(m.input[3 * 18 + 1], 0x8000, "UI send updates published R")
+
+    // matrix toggle flips a cell on/off
+    m.toggleInput(src: 1, dest: 2)
+    m.flush()
+    eq(last(Fireface400.mixAddress(kind: .input, src: 1, dest: 2)!)!, 0x8000,
+       "UI matrix toggle on")
+    m.toggleInput(src: 1, dest: 2)
+    m.flush()
+    eq(last(Fireface400.mixAddress(kind: .input, src: 1, dest: 2)!)!, 0,
+       "UI matrix toggle off")
+
+    // MAIN row: both faders + amp gains for both channels
+    let m2 = makeModel()
+    m2.setMain(pair: 0, gain: 0x4000)
+    m2.flush()
+    eq(last(0x8008_0f80)!, 0x4000, "UI main writes fader L")
+    eq(last(0x8008_0f84)!, 0x4000, "UI main writes fader R")
+    let gains = w.filter { $0.0 == Fireface400.gainRegister }
+    check(gains.contains { ($0.1 >> 16) == 4 }, "UI main writes amp idx 4")
+    check(gains.contains { ($0.1 >> 16) == 5 }, "UI main writes amp idx 5")
+
+    // MAIN mute flags both channels; hardware gets 0 + amp mute
+    m2.setMainMute(pair: 0, on: true)
+    m2.flush()
+    eq(last(0x8008_0f80)!, 0, "UI mainmute zeroes L fader")
+    eq(last(0x8008_0f84)!, 0, "UI mainmute zeroes R fader")
+    check(m2.outputMute[0] && m2.outputMute[1], "UI mainmute flags both")
+
+    // ST link: enabling adopts L's value into R; later set moves both
+    let m3 = makeModel()
+    _ = { w.removeAll() }()
+    m3.setOutput(2, gain: 0x6000)
+    m3.flush()
+    m3.setStereoPair(1, on: true)
+    m3.flush()
+    eq(last(0x8008_0f88)!, 0x6000, "UI ST adopts L value into R")
+    eq(m3.output[3], 0x6000, "UI ST published R follows L")
+    m3.setOutput(2, gain: 0x2000)
+    m3.flush()
+    eq(last(0x8008_0f8c)!, 0x2000, "UI linked set writes peer")
+
+    // preamp config chips -> 3-quadlet config block
+    let m4 = makeModel()
+    _ = { w.removeAll() }()
+    m4.setPhantom(0, on: true)
+    m4.flush()
+    eq(w.filter { $0.0 == Fireface400.configReg }.last!.1, 0x0000_0811,
+       "UI phantom writes config q0")
+    m4.setPad(0, on: true)   // pad on input 3 -> q0 bit8
+    m4.flush()
+    check(w.filter { $0.0 == Fireface400.configReg }.last!.1 & 0x100 != 0,
+          "UI pad sets q0 bit8")
+
+    // monitor bus change with an active solo rewrites old+new bus cells
+    let m5 = makeModel()
+    _ = { w.removeAll() }()
+    m5.setInputSend(4, gain: 0x8000)
+    m5.flush()
+    m5.setInputSolo(9, on: true)   // solo ch 9 -> ch 4 silenced on bus
+    m5.flush()
+    m5.monitorBus = 1              // AN 3/4
+    m5.syncBusPair()
+    m5.flush()
+    eq(last(Fireface400.mixAddress(kind: .input, src: 4, dest: 0)!)!, 0x8000,
+       "UI bus change restores old bus cell")
+    eq(last(Fireface400.mixAddress(kind: .input, src: 4, dest: 2)!)!, 0,
+       "UI bus change silences new bus cell (solo follows)")
+
+    // mono: UI toggle writes averaged pair cells for inputs AND playback
+    let m6 = makeModel()
+    _ = { w.removeAll() }()
+    m6.toggleInput(src: 5, dest: 0)      // L only = 0x8000, R stays 0
+    m6.flush()
+    m6.setMono(true)
+    m6.flush()
+    let avg: UInt32 = 0x4000             // (0x8000 + 0) / 2
+    eq(last(Fireface400.mixAddress(kind: .input, src: 5, dest: 0)!)!, avg,
+       "UI mono averages input L")
+    eq(last(Fireface400.mixAddress(kind: .input, src: 5, dest: 1)!)!, avg,
+       "UI mono averages input R")
+    eq(last(Fireface400.mixAddress(kind: .playback, src: 0, dest: 0)!)!,
+       avg, "UI mono averages playback (default 1:1 unity -> 0x4000)")
+
+    // disconnected model: action sets lastError, emits no writes
+    let md = MixerModel(testing: nil)
+    _ = { w.removeAll() }()
+    md.setOutput(0, gain: 0x4000)
+    md.flush()
+    check(w.isEmpty, "disconnected model writes nothing")
+    pump()
+    eq(md.lastError!, "not connected — change not applied",
+       "disconnected model reports error")
 }
 
 // MARK: - Version
