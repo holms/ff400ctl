@@ -57,7 +57,8 @@ final class MixerModel: ObservableObject {
             let c = try FirefaceController()
             ctl = c
             connected = true
-            syncBusPair()
+            let p = busPairs[monitorBus]
+            ctl?.busPair = (p.a, p.b)
             phantom = [c.config.phantom1, c.config.phantom2]
             pad = [c.config.pad3, c.config.pad4]
             instr = [c.config.instr3, c.config.instr4]
@@ -99,7 +100,7 @@ final class MixerModel: ObservableObject {
 
     func syncBusPair() {
         let p = busPairs[monitorBus]
-        ctl?.busPair = (p.a, p.b)
+        hw("bus") { c in c.setBusPair(a: p.a, b: p.b) }
     }
 
     func setInputSend(_ src: Int, gain: UInt32) {

@@ -363,5 +363,25 @@ do {
         eq(Fireface400.ampGainDB(index: 4, devval: rv & 0xffff), -10, "out round-trip")
     }
 }
+// MARK: - setBusPair (solo follows the bus)
+
+do {
+    var w5: [(UInt32, UInt32)] = []
+    let c5 = FirefaceController(testing: MixerState(),
+                                sink: { a, v in w5.append((a, v)); return true })
+    _ = c5.setInputFader(src: 5, dest: 0, gain: 0x8000)
+    _ = c5.setInputFader(src: 5, dest: 2, gain: 0x8000)
+    _ = c5.setInputSolo(src: 2, on: true)     // solo on pair (0,1) silences src5 there
+    check(c5.setBusPair(a: 2, b: 3), "setBusPair accepted")
+    eq(c5.busPair.a, 2, "busPair updated")
+    let c50 = Fireface400.mixAddress(kind: .input, src: 5, dest: 0)!
+    let c52 = Fireface400.mixAddress(kind: .input, src: 5, dest: 2)!
+    eq(w5.last(where: { $0.0 == c50 })!.1, 0x8000,
+       "old bus cell restored on bus change")
+    eq(w5.last(where: { $0.0 == c52 })!.1, 0,
+       "new bus cell silenced by active solo")
+    check(!c5.setBusPair(a: 18, b: 0), "setBusPair a=18 rejected")
+    check(!c5.setBusPair(a: 0, b: -1), "setBusPair b=-1 rejected")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

@@ -15,6 +15,10 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   (whole dB), matching FFADO's `set_hardware_ampgain`
 - Tray preamp sliders showed 0 dB regardless of hardware state; they're
   now initialized from tracked amp gains via the new `ampGainDB` inverse
+- Monitor-bus change raced the hw queue (`busPair` mutated on main) and
+  left stale solo-silenced cells on the old pair while the new pair was
+  unsilenced — new `setBusPair` runs on the queue and rewrites affected
+  cells
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)

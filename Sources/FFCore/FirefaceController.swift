@@ -236,6 +236,29 @@ extension FirefaceController {
         return ok
     }
 
+    /// Switch the monitor bus pair. While a solo is active the old pair's
+    /// silenced cells and the new pair's cells must be rewritten so the
+    /// solo follows the bus; always call this on the hw queue — `busPair`
+    /// is read by the solo/mono/effective-cell logic there.
+    @discardableResult
+    public func setBusPair(a: Int, b: Int) -> Bool {
+        guard (0..<Fireface400.channelCount).contains(a),
+              (0..<Fireface400.channelCount).contains(b) else { return false }
+        let old = busPair
+        busPair = (a, b)
+        guard state.inputSolo.contains(true) else { return true }
+        var ok = true
+        for s in 0..<Fireface400.channelCount {
+            // Rewrite with the NEW pair so effectiveInputCell evaluates
+            // correctly for both the old dests (restore) and the new.
+            if !writeInputCell(src: s, dest: old.a) { ok = false }
+            if !writeInputCell(src: s, dest: old.b) { ok = false }
+            if !writeInputCell(src: s, dest: a) { ok = false }
+            if !writeInputCell(src: s, dest: b) { ok = false }
+        }
+        return ok
+    }
+
     /// Mono-lock the monitor bus pair: mirror the left cell values into the
     /// right for every input, so both outputs carry the same mix.
     @discardableResult
