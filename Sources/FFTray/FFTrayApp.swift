@@ -1,19 +1,64 @@
 import SwiftUI
+import AppKit
+import OSLog
 import FFCore
+
+private let trayLog = Logger(subsystem: "net.holms.fftray", category: "ui")
 
 @main
 struct FFTrayApp: App {
-    @StateObject private var model = MixerModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            ContentView()
-                .environmentObject(model)
-        } label: {
-            Label("FF400", systemImage: "slider.horizontal.3")
-                .labelStyle(.titleAndIcon)
+        // Persistent status item + popover live in AppDelegate — the
+        // panel is built once, not per-click like MenuBarExtra(.window).
+        Settings { EmptyView() }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = MixerModel()
+    private var statusItem: NSStatusItem!
+    private var popover: NSPopover!
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let t0 = Date()
+        let hosting = NSHostingController(
+            rootView: ContentView().environmentObject(model))
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.animates = false
+        pop.appearance = NSAppearance(named: .darkAqua)
+        pop.contentViewController = hosting
+        // Prewarm: size + lay out the whole view once at launch so even
+        // the first click is fast. `ms` is what MenuBarExtra paid per open.
+        hosting.view.frame = NSRect(origin: .zero, size: hosting.view.fittingSize)
+        hosting.view.layoutSubtreeIfNeeded()
+        pop.contentSize = hosting.view.fittingSize
+        popover = pop
+
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let b = item.button {
+            b.image = NSImage(systemSymbolName: "slider.horizontal.3",
+                              accessibilityDescription: "FF400")
+            b.imagePosition = .imageLeading
+            b.title = "FF400"
+            b.target = self
+            b.action = #selector(togglePopover)
         }
-        .menuBarExtraStyle(.window)
+        statusItem = item
+        model.onDetach = { [weak pop] in pop?.performClose(nil) }
+        trayLog.notice("panel built in \(Date().timeIntervalSince(t0) * 1000, privacy: .public) ms")
+    }
+
+    @objc private func togglePopover() {
+        guard let pop = popover, let button = statusItem.button else { return }
+        if pop.isShown {
+            pop.performClose(nil)
+        } else {
+            pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
@@ -57,6 +102,9 @@ final class MixerModel: NSObject, ObservableObject {
     /// newer save is still queued behind the reload) from real external
     /// changes.
     private var lastSaved: MixerState?
+    /// Called when the detached window opens — AppDelegate closes the
+    /// popover so the mixer isn't shown in two places.
+    var onDetach: (() -> Void)?
 
     override init() {
         let s = MixerState.load()
@@ -142,7 +190,7 @@ final class MixerModel: NSObject, ObservableObject {
             guard s != c.state, s != self.lastSaved else { return }
             c.restoreState(s)
             self.lastSaved = s
-            NSLog("FFTray: reloaded state changed externally")
+            trayLog.notice("reloaded state changed externally")
             DispatchQueue.main.async { self.publish(s) }
         }
     }
@@ -352,6 +400,7 @@ final class MixerModel: NSObject, ObservableObject {
     /// Open the same UI in a persistent titled window that survives focus
     /// changes (the menu-bar panel auto-closes whenever it loses focus).
     func openDetached() {
+        onDetach?()
         if detachedWindow == nil {
             let host = NSHostingController(
                 rootView: ContentView(detached: true).environmentObject(self))

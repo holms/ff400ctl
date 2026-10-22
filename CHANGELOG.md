@@ -61,6 +61,10 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ### Changed
 - Fader value labels enlarged 9pt → 11pt (wider edit field)
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)
+- Tray panel opens instantly: `MenuBarExtra(.window)` rebuilt the whole
+  view on every click (~1.3 s on a MacPro6,1). Replaced with a persistent
+  `NSStatusItem` + `NSPopover` whose content is built and laid out once
+  at launch (build time logged under `net.holms.fftray`)
 
 ## [0.4.0] - 2026-10-23
 
