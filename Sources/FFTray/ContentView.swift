@@ -22,6 +22,7 @@ private enum Theme {
 struct EditableValue: View {
     let text: String
     var width: CGFloat = 30
+    var fontSize: CGFloat = 11
     let onCommit: (String) -> Void
     @State private var editing = false
     @State private var draft = ""
@@ -32,7 +33,7 @@ struct EditableValue: View {
             if editing {
                 TextField("", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: fontSize, design: .monospaced))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Theme.text)
                     .focused($focused)
@@ -41,7 +42,7 @@ struct EditableValue: View {
                     .onChange(of: focused) { f in if !f { commit() } }
             } else {
                 Text(text)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: fontSize, design: .monospaced))
                     .foregroundStyle(Theme.secondary)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -128,12 +129,15 @@ private func parseDB(_ s: String) -> Double? {
 
 struct ContentView: View {
     @EnvironmentObject private var model: MixerModel
+    /// Which stereo output pair the MAIN row drives (persisted per user).
+    @AppStorage("mainPair") private var mainPair = 0
     /// True when hosted in the detached NSWindow (hides Detach/Quit buttons).
     var detached = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            mainRow
             Picker("Matrix", selection: $model.matrixTab) {
                 Text("Inputs").tag(0)
                 Text("Playback").tag(1)
@@ -176,6 +180,38 @@ struct ContentView: View {
             Spacer()
             if let e = model.lastError {
                 Text(e).font(.caption).foregroundStyle(.orange).lineLimit(1)
+            }
+        }
+    }
+
+    /// MAIN volume — one prominent slider driving a stereo output pair.
+    private var mainRow: some View {
+        let l = mainPair * 2, r = l + 1
+        return HStack(spacing: 10) {
+            Text("MAIN")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundStyle(Theme.text)
+            Picker("Pair", selection: $mainPair) {
+                ForEach(0..<busPairs.count, id: \.self) { i in
+                    Text(busPairs[i].name).tag(i)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 100)
+            MainSlider(
+                gain: model.output[l],
+                onCommit: { model.setMain(pair: mainPair, gain: $0) },
+                onLive: { model.previewMain(pair: mainPair, gain: $0) },
+                onText: { t in
+                    if let db = parseDB(t) {
+                        model.setMain(pair: mainPair, gain: Fireface400.gain(fromDB: db))
+                    }
+                })
+            FlagButton("M", on: model.outputMute[l] && model.outputMute[r],
+                       color: .orange) {
+                model.setMainMute(pair: mainPair,
+                                  on: !(model.outputMute[l] && model.outputMute[r]))
             }
         }
     }
@@ -387,6 +423,37 @@ struct ContentView: View {
         }
         .buttonStyle(.borderless)
         .font(.caption)
+    }
+}
+
+/// Horizontal main-volume slider: drag state stays view-local (preview
+/// writes via onLive), commit through the model on release — same pattern
+/// as VFader. Travel maps linearly over -60…+6 dB, bottom = mute.
+private struct MainSlider: View {
+    let gain: UInt32
+    let onCommit: (UInt32) -> Void
+    let onLive: (UInt32) -> Void
+    let onText: (String) -> Void
+    @State private var live: Double?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Slider(
+                value: Binding(
+                    get: { live ?? Fireface400.mainSliderPos(gain) },
+                    set: { live = $0; onLive(Fireface400.mainSliderGain($0)) }),
+                in: 0...1,
+                onEditingChanged: { editing in
+                    if !editing, let p = live {
+                        onCommit(Fireface400.mainSliderGain(p))
+                        live = nil
+                    }
+                })
+            EditableValue(
+                text: fmtDB(Fireface400.db(fromGain:
+                    live.map { Fireface400.mainSliderGain($0) } ?? gain)),
+                width: 44, fontSize: 13, onCommit: onText)
+        }
     }
 }
 

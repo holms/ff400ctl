@@ -52,6 +52,9 @@ ffctl mon [in] [outs...]     # route input -> outputs at 0 dB (default: in0 -> o
 ffctl mix <in> <out> <g>     # input -> output fader cell
 ffctl pb <pb> <out> <g>      # host playback -> output fader cell (Mac audio)
 ffctl outvol <ch> <g>        # output master fader (also syncs hw amp gain)
+ffctl main <g> [pair]        # main volume: both channels of a stereo pair
+                             # (default pair 0 = AN1/2); gain syntax like outvol
+ffctl mainmute <on|off> [p]  # mute/unmute a whole stereo pair
 ffctl 1to1                   # restore playback i -> out i at 0 dB
 ffctl mute-all               # zero every input -> output fader cell
 ffctl apply                  # re-write the entire tracked state to hardware
@@ -172,9 +175,11 @@ outvol 6 -6dB        # phones down a touch
 
 ```bash
 # Hotkey volume (bind in skhd / Shortcuts / BetterTouchTool)
-ffctl outvol 0 -3dB && ffctl outvol 1 -3dB     # mains down
-ffctl outvol 0 +3dB && ffctl outvol 1 +3dB     # mains up
-ffctl outmute 0 on && ffctl outmute 1 on       # mute mains
+ffctl main -3dB              # mains down (whole pair at once)
+ffctl main +3dB              # mains up
+ffctl outvol 0 -3dB && ffctl outvol 1 -3dB     # mains down (per channel)
+ffctl outvol 0 +3dB && ffctl outvol 1 +3dB     # mains up (per channel)
+ffctl mainmute on            # mute mains
 
 # Session presets
 ffctl save tracking    # mic up, phantom on, cue sends set

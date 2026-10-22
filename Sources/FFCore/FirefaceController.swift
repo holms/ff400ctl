@@ -328,6 +328,25 @@ extension FirefaceController {
         return ok
     }
 
+    /// Set both faders of an output stereo pair (the tray's MAIN row),
+    /// regardless of the pair's stereo-link flag.
+    @discardableResult
+    public func setPairFader(pair: Int, gain: UInt32) -> Bool {
+        guard (0..<Fireface400.channelCount / 2).contains(pair) else { return false }
+        var ok = setOutputFader(ch: pair * 2, gain: gain)
+        ok = setOutputFader(ch: pair * 2 + 1, gain: gain) && ok
+        return ok
+    }
+
+    /// Mute/unmute both channels of an output stereo pair.
+    @discardableResult
+    public func setPairMute(pair: Int, on: Bool) -> Bool {
+        guard (0..<Fireface400.channelCount / 2).contains(pair) else { return false }
+        var ok = setOutputMute(ch: pair * 2, on: on)
+        ok = setOutputMute(ch: pair * 2 + 1, on: on) && ok
+        return ok
+    }
+
     /// Stereo-link an output fader pair (0..<9 → channels 2i/2i+1).
     /// Software-only flag — the UI/CLI mirror fader writes across the pair.
     @discardableResult

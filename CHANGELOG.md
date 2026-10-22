@@ -4,6 +4,13 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Added
+- **MAIN volume row** in FFTray — one slider + mute for a stereo output
+  pair (pair picker, -60…+6 dB linear travel, bottom = mute); new
+  `setPairFader`/`setPairMute` in FFCore, `ffctl main <g> [pair]` and
+  `ffctl mainmute <on|off> [pair]` (relative dB steps supported for
+  hotkey scripts)
+
 ### Fixed
 - Input/output strips showed no scroll affordance and the last fader was
   visibly clipped at the panel edge — scrollbars are now shown, the last

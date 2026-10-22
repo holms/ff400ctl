@@ -52,6 +52,9 @@ sufficient on the machine where ASFW runs — the Makefile does it for you.
 
 Menu-bar slider icon → click:
 
+- **MAIN** — one prominent volume slider for a stereo output pair
+  (picker for which pair, -60…+6 dB travel, mute = bottom), with a
+  mute button and click-to-type dB entry.
 - **Inputs / Playback** segmented tabs — one matrix row per source channel,
   one column per output channel (1–6 = Analog 1-6, 7–8 = Phones, 9–10 = SPDIF,
   11–18 = ADAT). Click a cell to toggle the crosspoint between mute and 0 dB.

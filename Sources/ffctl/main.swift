@@ -9,6 +9,8 @@ func usage() -> Never {
       ffctl mix <in> <out> <g>     input fader cell     g = hex/dec/…dB  (0x8000 = 0 dB, 0 = mute)
       ffctl pb <pb> <out> <g>      playback fader cell  (what Mac audio uses)
       ffctl outvol <ch> <g>        output master fader  (also syncs hw amp gain)
+      ffctl main <g> [pair]        main volume for a stereo pair (default: pair 0 = AN1/2)
+      ffctl mainmute <on|off> [p]  mute/unmute a stereo pair
       ffctl gain <idx> <dB>        hw amp gain: 0-1 mic, 2-3 inputs 3/4, 4-9 out1-6,
                                    10-11 phones, 12-13 spdif, 14-21 adat
       ffctl phantom <1|2> <on|off> +48V phantom on mic input
@@ -95,6 +97,16 @@ func run(_ a: ArraySlice<String>, _ ctl: FirefaceController) -> Int32 {
         if ctl.state.outputStereo[ch / 2] {
             _ = ok(ctl.setOutputFader(ch: ch ^ 1, gain: g), "output fader (linked peer)")
         }
+    case "main":
+        guard a.count > 1, let pair = a.count > 2 ? Int(a[2]) : 0,
+              (0..<Fireface400.channelCount / 2).contains(pair),
+              let g = Fireface400.parseGainArgument(a[1], current: ctl.state.output[pair * 2])
+        else { usage() }
+        guard ok(ctl.setPairFader(pair: pair, gain: g), "main pair \(pair)") else { return 1 }
+    case "mainmute":
+        guard a.count > 1, let on = onOff(a[1]),
+              let pair = a.count > 2 ? Int(a[2]) : 0 else { usage() }
+        guard ok(ctl.setPairMute(pair: pair, on: on), "mainmute \(pair)") else { return 1 }
     case "phantom":
         guard a.count > 2, let ch = Int(a[1]), (1...2).contains(ch),
               let on = onOff(a[2]) else { usage() }

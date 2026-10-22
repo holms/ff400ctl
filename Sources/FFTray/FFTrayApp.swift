@@ -320,6 +320,30 @@ final class MixerModel: NSObject, ObservableObject {
         hw("ingain.\(i)") { c in c.setAmpGain(index: idx, dB: dB) }
     }
 
+    // MARK: - MAIN row (one control for a stereo output pair)
+
+    /// Drag preview for the MAIN slider — hardware writes only.
+    func previewMain(pair: Int, gain: UInt32) {
+        let l = pair * 2, r = l + 1
+        hw("out.\(l)") { c in c.setOutputFader(ch: l, gain: gain) }
+        hw("out.\(r)") { c in c.setOutputFader(ch: r, gain: gain) }
+    }
+
+    func setMain(pair: Int, gain: UInt32) {
+        let l = pair * 2, r = l + 1
+        output[l] = gain
+        output[r] = gain
+        hw("out.\(l)") { c in c.setOutputFader(ch: l, gain: gain) }
+        hw("out.\(r)") { c in c.setOutputFader(ch: r, gain: gain) }
+    }
+
+    func setMainMute(pair: Int, on: Bool) {
+        let l = pair * 2, r = l + 1
+        outputMute[l] = on
+        outputMute[r] = on
+        hw("mainmute.\(pair)") { c in c.setPairMute(pair: pair, on: on) }
+    }
+
     func setOutput(_ ch: Int, gain: UInt32) {
         output[ch] = gain
         let peer = ch ^ 1, linked = outputStereo[ch / 2]

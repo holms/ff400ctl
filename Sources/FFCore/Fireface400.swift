@@ -52,6 +52,22 @@ public enum Fireface400 {
         return 20.0 * log10(Double(gain) / 32768.0)
     }
 
+    // MARK: - MAIN slider mapping
+
+    /// MAIN fader travel maps linearly over -60…+6 dB; position 0 is mute
+    /// (gain 0, -∞ dB). Used by the tray's main volume row.
+    public static func mainSliderGain(_ pos: Double) -> UInt32 {
+        guard pos > 0 else { return 0 }
+        return gain(fromDB: -60 + 66 * min(pos, 1))
+    }
+
+    /// Inverse of `mainSliderGain`: gain 0 → 0 (mute), ≥ +6 dB → 1.
+    public static func mainSliderPos(_ gain: UInt32) -> Double {
+        let dB = db(fromGain: gain)
+        guard dB.isFinite else { return 0 }
+        return min(max((dB + 60) / 66, 0), 1)
+    }
+
     /// Parse a gain argument: absolute hex (`0x8000`), decimal, dB (`-6dB`),
     /// or a relative dB step (`+3dB` / `-3dB`) applied to `current`.
     /// A relative step on a muted cell (0) starts from -90 dB.

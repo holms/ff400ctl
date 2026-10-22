@@ -527,5 +527,44 @@ do {
     eq(hit(17 * 28 + 25, 17 * 20 + 17)?.row, 17, "just inside last row")
     eq(hit(17 * 28 + 25, 17 * 20 + 17)?.col, 17, "just inside last col")
 }
+// MARK: - MAIN pair controls + slider mapping
+
+do {
+    var w: [(UInt32, UInt32)] = []
+    let c = FirefaceController(testing: MixerState(),
+                               sink: { a, v in w.append((a, v)); return true })
+    func last(_ addr: UInt32) -> UInt32? { w.last(where: { $0.0 == addr })?.1 }
+
+    check(c.setPairFader(pair: 0, gain: 0x4000), "setPairFader ok")
+    eq(last(0x8008_0f80)!, 0x4000, "pair fader L written")
+    eq(last(0x8008_0f84)!, 0x4000, "pair fader R written")
+    var gains = w.filter { $0.0 == Fireface400.gainRegister }
+    check(gains.contains { ($0.1 >> 16) == 4 }, "pair amp gain index 4 written")
+    check(gains.contains { ($0.1 >> 16) == 5 }, "pair amp gain index 5 written")
+    check(!c.setPairFader(pair: 9, gain: 0x4000), "setPairFader pair 9 rejected")
+
+    check(c.setPairMute(pair: 3, on: true), "setPairMute ok")
+    eq(last(Fireface400.outputFaderAddress(ch: 6)!)!, 0, "pair mute writes 0 L")
+    eq(last(Fireface400.outputFaderAddress(ch: 7)!)!, 0, "pair mute writes 0 R")
+    gains = w.filter { $0.0 == Fireface400.gainRegister }
+    eq(gains.last(where: { ($0.1 >> 16) == 10 })!.1 & 0xffff, 0x3f,
+       "pair mute amp index 10 muted")
+    eq(gains.last(where: { ($0.1 >> 16) == 11 })!.1 & 0xffff, 0x3f,
+       "pair mute amp index 11 muted")
+    eq(c.state.output[6], Fireface400.unityGain, "pair mute keeps fader value")
+
+    eq(Fireface400.mainSliderGain(0), 0, "slider pos 0 = mute")
+    eq(Fireface400.mainSliderGain(-0.5), 0, "slider pos <0 = mute")
+    close(Double(Fireface400.mainSliderGain(1)),
+          Double(Fireface400.gain(fromDB: 6)), 1, "slider pos 1 = +6dB")
+    close(Fireface400.mainSliderPos(Fireface400.unityGain), 60.0 / 66.0, 0.001,
+          "unity gain pos ≈ 60/66")
+    for p in [0.25, 0.5, 0.75] {
+        close(Fireface400.mainSliderPos(Fireface400.mainSliderGain(p)), p, 0.01,
+              "slider round-trip \(p)")
+    }
+    eq(Fireface400.mainSliderPos(0), 0, "gain 0 -> pos 0")
+    eq(Fireface400.mainSliderPos(Fireface400.gain(fromDB: 10)), 1, ">=+6dB -> pos 1")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)
