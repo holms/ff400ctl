@@ -1,5 +1,12 @@
 # ff400ctl
 
+[![CI](https://github.com/holms/ff400ctl/actions/workflows/ci.yml/badge.svg)](https://github.com/holms/ff400ctl/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/holms/ff400ctl)](https://github.com/holms/ff400ctl/releases/latest)
+[![License](https://img.shields.io/github/license/holms/ff400ctl)](LICENSE)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue)
+![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange)
+![Universal](https://img.shields.io/badge/arch-x86__64%20%7C%20arm64-lightgrey)
+
 Control an **RME Fireface 400** mixer on modern macOS **without TotalMix** —
 through the [ASFW](https://github.com/mrmidi/ASFireWire) DriverKit user client.
 
