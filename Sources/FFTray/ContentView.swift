@@ -112,6 +112,8 @@ private func parseDB(_ s: String) -> Double? {
 
 struct ContentView: View {
     @EnvironmentObject private var model: MixerModel
+    /// True when hosted in the detached NSWindow (hides Detach/Quit buttons).
+    var detached = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -346,10 +348,15 @@ struct ContentView: View {
         HStack(spacing: 12) {
             Button("Re-apply mix") { model.applyAll() }
             Button("Save state") { model.save() }
+            if !detached {
+                Button("Detach") { model.openDetached() }
+            }
             Spacer()
             Text("mixer RAM is volatile — re-apply after power cycle")
                 .font(.caption2).foregroundStyle(Theme.secondary)
-            Button("Quit") { NSApplication.shared.terminate(nil) }
+            if !detached {
+                Button("Quit") { NSApplication.shared.terminate(nil) }
+            }
         }
         .buttonStyle(.borderless)
         .font(.caption)

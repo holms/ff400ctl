@@ -262,4 +262,25 @@ final class MixerModel: ObservableObject {
     func save() {
         hwq.submit("save") { [weak self] in self?.ctl?.saveState() }
     }
+
+    // MARK: - Detached window
+
+    private var detachedWindow: NSWindow?
+
+    /// Open the same UI in a persistent titled window that survives focus
+    /// changes (the menu-bar panel auto-closes whenever it loses focus).
+    func openDetached() {
+        if detachedWindow == nil {
+            let host = NSHostingController(
+                rootView: ContentView(detached: true).environmentObject(self))
+            let w = NSWindow(contentViewController: host)
+            w.title = "Fireface 400 Mixer"
+            w.styleMask = [.titled, .closable, .miniaturizable]
+            w.isReleasedWhenClosed = false
+            detachedWindow = w
+        }
+        detachedWindow?.center()
+        detachedWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 }
