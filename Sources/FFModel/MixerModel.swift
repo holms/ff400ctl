@@ -48,11 +48,8 @@ public final class MixerModel: NSObject, ObservableObject {
 
     var ctl: FirefaceController?
     let hwq = WriteCoalescer()
-    /// Watches the state.json directory for writes by ffctl (atomic saves
-    /// replace the file, so the directory is watched, not the file).
-    private var stateWatcher: DispatchSourceFileSystemObject?
-    private var stateWatcherFD: Int32 = -1
-    private var reloadScheduled = false
+    /// Watches the state.json directory for writes by ffctl.
+    private var stateWatcher: DirectoryWatcher?
     /// State at our own most recent save. Touched ONLY on the hw queue —
     /// lets the file watcher tell our autosaves (and files read while a
     /// newer save is still queued behind the reload) from real external
@@ -103,8 +100,15 @@ public final class MixerModel: NSObject, ObservableObject {
         lastSaved = c.state
     }
 
-    deinit {
-        stateWatcher?.cancel()
+    /// Persist state now (app termination). The save goes through the hw
+    /// queue so `lastSaved` is only ever touched there — the reload path
+    /// reads it on the same queue.
+    public func flushAndSave() {
+        hwq.submit("save") { [weak self] in
+            guard let self, let c = self.ctl else { return }
+            c.saveState(); self.lastSaved = c.state
+        }
+        hwq.waitUntilIdle()
     }
 
     /// Re-apply the tracked mix — called by the app's presence watcher
@@ -116,12 +120,6 @@ public final class MixerModel: NSObject, ObservableObject {
 
     /// Drain pending hw-queue work (tests + shutdown).
     public func flush() { hwq.waitUntilIdle() }
-
-    /// Persist state now (app termination).
-    public func flushAndSave() {
-        hwq.waitUntilIdle()
-        if let c = ctl { c.saveState(); lastSaved = c.state }
-    }
 
     /// Push a MixerState into every @Published property.
     func publish(_ s: MixerState) {
@@ -144,27 +142,9 @@ public final class MixerModel: NSObject, ObservableObject {
     }
 
     private func watchStateFile() {
-        let dir = MixerState.storeURL.deletingLastPathComponent()
-        stateWatcherFD = open(dir.path, O_EVTONLY)
-        guard stateWatcherFD >= 0 else { return }
-        let src = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: stateWatcherFD, eventMask: .write, queue: .main)
-        let fd = stateWatcherFD
-        src.setEventHandler { [weak self] in self?.stateFileChanged() }
-        src.setCancelHandler { close(fd) }
-        src.resume()
-        stateWatcher = src
-    }
-
-    /// Debounce rapid save bursts (~200 ms) before reloading.
-    private func stateFileChanged() {
-        if reloadScheduled { return }
-        reloadScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            guard let self else { return }
-            self.reloadScheduled = false
-            self.reloadStateIfChanged()
-        }
+        stateWatcher = DirectoryWatcher(
+            directory: MixerState.storeURL.deletingLastPathComponent()
+        ) { [weak self] in self?.reloadStateIfChanged() }
     }
 
     /// Re-read state.json on the hw queue; adopt it when it differs from

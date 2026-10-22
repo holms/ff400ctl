@@ -696,6 +696,50 @@ do {
        "disconnected model reports error")
 }
 
+// MARK: - ExternalStateWatcher.shouldAdopt (reload rule)
+
+do {
+    var a = MixerState(), b = MixerState()
+    a.input[0] = 0x8000                     // "current" tracked state
+    b.input[5] = 0x1234                     // "file" written by ffctl
+
+    check(ExternalStateWatcher.shouldAdopt(file: b, current: a, lastSaved: nil),
+          "external change adopted")
+    check(!ExternalStateWatcher.shouldAdopt(file: a, current: a, lastSaved: nil),
+          "file == current skipped")
+    check(!ExternalStateWatcher.shouldAdopt(file: a, current: b, lastSaved: a),
+          "own autosave (file == lastSaved) skipped")
+    // stale-save case: file still equals lastSaved while a newer save is
+    // queued behind the reload — restoring it would rewind a live drag.
+    var newer = a; newer.input[0] = 0x2222  // drag in progress, save queued
+    check(!ExternalStateWatcher.shouldAdopt(file: a, current: newer, lastSaved: a),
+          "stale file (== lastSaved, != current) skipped")
+    // but a file differing from BOTH is a real external write -> adopt
+    var external = a; external.input[0] = 0x1111
+    check(ExternalStateWatcher.shouldAdopt(file: external, current: b, lastSaved: a),
+          "genuinely different external file adopted")
+}
+
+// MARK: - DirectoryWatcher (FS integration, generous timeouts)
+
+do {
+    let dir = testStateDir + "/watch-\(ProcessInfo.processInfo.processIdentifier)"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    var fires = 0
+    let watcher = DirectoryWatcher(directory: URL(fileURLWithPath: dir),
+                                   debounce: 0.05) { fires += 1 }
+    check(watcher != nil, "DirectoryWatcher created")
+    // burst of 3 writes -> one debounced handler call
+    for i in 0..<3 {
+        try? "x\(i)".write(toFile: dir + "/f.json", atomically: true, encoding: .utf8)
+    }
+    let deadline = Date().addingTimeInterval(2)
+    while fires == 0 && Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+    eq(fires, 1, "burst of writes -> one debounced callback")
+}
+
 // MARK: - Version
 
 do {

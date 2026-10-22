@@ -18,3 +18,34 @@ public enum ExternalStateWatcher {
         file != current && file != lastSaved
     }
 }
+
+/// Watches a directory for write events and invokes `handler` after a
+/// debounce interval — bursts (e.g. ffctl's atomic save + follow-up
+/// writes) collapse into a single call. Atomic saves replace files, so
+/// the DIRECTORY is watched, not the file.
+public final class DirectoryWatcher {
+    private var source: DispatchSourceFileSystemObject?
+
+    public init?(directory: URL, debounce: TimeInterval = 0.2,
+                 queue: DispatchQueue = .main,
+                 handler: @escaping () -> Void) {
+        let fd = open(directory.path, O_EVTONLY)
+        guard fd >= 0 else { return nil }
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: .write, queue: queue)
+        var scheduled = false
+        src.setEventHandler {
+            guard !scheduled else { return }
+            scheduled = true
+            queue.asyncAfter(deadline: .now() + debounce) {
+                scheduled = false
+                handler()
+            }
+        }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        source = src
+    }
+
+    deinit { source?.cancel() }
+}
