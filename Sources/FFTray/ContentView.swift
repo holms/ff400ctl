@@ -1,5 +1,6 @@
 import SwiftUI
 import FFCore
+import FFModel
 
 private let cellSize: CGFloat = 26
 private let faderColW: CGFloat = 40

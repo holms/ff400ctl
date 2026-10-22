@@ -6,17 +6,22 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "FFCore", targets: ["FFCore"]),
+        .library(name: "FFModel", targets: ["FFModel"]),
         .executable(name: "ffctl", targets: ["ffctl"]),
         .executable(name: "FFTray", targets: ["FFTray"]),
     ],
     targets: [
         .target(name: "FFCore", dependencies: []),
+        // Testable view-model layer: no AppKit — the tray app injects the
+        // AppKit/CoreAudio bits (presence watcher, detached window,
+        // launch-at-login) on top.
+        .target(name: "FFModel", dependencies: ["FFCore"]),
         .executableTarget(name: "ffctl", dependencies: ["FFCore"]),
         .executableTarget(
             name: "FFTray",
-            dependencies: ["FFCore"],
+            dependencies: ["FFCore", "FFModel"],
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
-        .executableTarget(name: "fftests", dependencies: ["FFCore"]),
+        .executableTarget(name: "fftests", dependencies: ["FFCore", "FFModel"]),
     ]
 )
