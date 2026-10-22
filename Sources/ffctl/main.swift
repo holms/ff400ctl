@@ -14,6 +14,11 @@ func usage() -> Never {
       ffctl phantom <1|2> <on|off> +48V phantom on mic input
       ffctl pad <3|4> <on|off>     -20 dB pad on input 3/4
       ffctl instr <3|4> <on|off>   instrument mode on input 3/4
+      ffctl mute <in> <on|off>   mute input row on all outputs
+      ffctl solo <in> <on|off>   exclusive solo on monitor bus (AN1/2)
+      ffctl phase <in> <on|off>  phase invert input row (negative gain)
+      ffctl outmute <ch> <on|off> mute output master fader
+      ffctl mono <on|off>        mono-lock the AN1/2 bus pair
       ffctl cfg <key> <val>        config fields: ilevel/olevel/phlevel
                                    (logain|4dbu|10dbv), spdifpro on|off
       ffctl config                 show tracked config + quadlets
@@ -85,6 +90,21 @@ case "instr":
     guard args.count > 3, let ch = Int(args[2]), (3...4).contains(ch),
           let on = onOff(args[3]) else { usage() }
     ok(ctl.setInstrument(ch: ch - 1, on: on), "instr \(args[2]) \(args[3])")
+case "mute":
+    guard args.count > 3, let src = Int(args[2]), let on = onOff(args[3]) else { usage() }
+    ok(ctl.setInputMute(src: src, on: on), "mute in \(src)")
+case "solo":
+    guard args.count > 3, let src = Int(args[2]), let on = onOff(args[3]) else { usage() }
+    ok(ctl.setInputSolo(src: src, on: on), "solo in \(src)")
+case "phase":
+    guard args.count > 3, let src = Int(args[2]), let on = onOff(args[3]) else { usage() }
+    ok(ctl.setInputPhase(src: src, on: on), "phase in \(src)")
+case "outmute":
+    guard args.count > 3, let ch = Int(args[2]), let on = onOff(args[3]) else { usage() }
+    ok(ctl.setOutputMute(ch: ch, on: on), "outmute \(ch)")
+case "mono":
+    guard args.count > 2, let on = onOff(args[2]) else { usage() }
+    ok(ctl.setMonoBus(on: on), "mono \(on)")
 case "cfg":
     guard args.count > 3 else { usage() }
     var c = ctl.config

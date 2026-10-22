@@ -163,5 +163,72 @@ do {
 }
 
 // Re-print summary including the new block (the earlier exit() was moved below).
+// MARK: - Mute / solo / phase / mono (controller + sink)
+
+do {
+    var writes: [(UInt32, UInt32)] = []
+    let sink: (UInt32, UInt32) -> Bool = { a, v in writes.append((a, v)); return true }
+    let ctl = FirefaceController(testing: MixerState(), sink: sink)
+
+    // phase: cell written as negative gain
+    _ = ctl.setInputFader(src: 2, dest: 0, gain: 0x8000)
+    _ = ctl.setInputPhase(src: 2, on: true)
+    // last write to in2->out0 should be -0x8000
+    let cellAddr = Fireface400.mixAddress(kind: .input, src: 2, dest: 0)!
+    let last = writes.last(where: { $0.0 == cellAddr })!.1
+    eq(last, UInt32(bitPattern: Int32(-0x8000)), "phase writes negative gain")
+
+    // phase of a zero cell maps to -1 (FFADO glitch guard)
+    _ = ctl.setInputPhase(src: 5, on: true)
+    let zeroCell = Fireface400.mixAddress(kind: .input, src: 5, dest: 0)!
+    eq(writes.last(where: { $0.0 == zeroCell })!.1,
+       UInt32(bitPattern: Int32(-1)), "phase of 0 cell -> -1")
+
+    // mute: fader write stores value but hardware gets 0
+    let ctl2 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = ctl2.setInputMute(src: 0, on: true)
+    _ = ctl2.setInputFader(src: 0, dest: 0, gain: 0x8000)
+    eq(ctl2.state.input[0], 0x8000, "muted fader value still tracked")
+    let c00 = Fireface400.mixAddress(kind: .input, src: 0, dest: 0)!
+    eq(writes.last(where: { $0.0 == c00 })!.1, 0, "muted cell writes 0")
+    _ = ctl2.setInputMute(src: 0, on: false)
+    eq(writes.last(where: { $0.0 == c00 })!.1, 0x8000, "unmute restores fader")
+
+    // solo on bus pair (0,1): others get 0 on bus cells only
+    let ctl3 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = ctl3.setInputFader(src: 3, dest: 0, gain: 0x8000)
+    _ = ctl3.setInputFader(src: 3, dest: 1, gain: 0x8000)
+    _ = ctl3.setInputFader(src: 3, dest: 7, gain: 0x8000)  // phones — NOT on bus
+    _ = ctl3.setInputSolo(src: 2, on: true)
+    let c30 = Fireface400.mixAddress(kind: .input, src: 3, dest: 0)!
+    let c37 = Fireface400.mixAddress(kind: .input, src: 3, dest: 7)!
+    eq(writes.last(where: { $0.0 == c30 })!.1, 0, "non-soloed input -> 0 on bus cell")
+    eq(writes.last(where: { $0.0 == c37 })!.1, 0x8000, "non-soloed input untouched off-bus")
+    _ = ctl3.setInputSolo(src: 2, on: false)
+    eq(writes.last(where: { $0.0 == c30 })!.1, 0x8000, "unsolo restores bus cell")
+
+    // exclusive solo
+    _ = ctl3.setInputSolo(src: 1, on: true)
+    check(ctl3.state.inputSolo[1] && !ctl3.state.inputSolo[2], "solo is exclusive")
+
+    // mono: mirrors L cell into R on the bus pair
+    let ctl4 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = ctl4.setInputFader(src: 4, dest: 0, gain: 0x4000)
+    _ = ctl4.setInputFader(src: 4, dest: 1, gain: 0)
+    _ = ctl4.setMonoBus(on: true)
+    eq(ctl4.state.input[MixerState.index(src: 4, dest: 1)], 0x4000,
+       "mono mirrors L cell into R")
+    let c41 = Fireface400.mixAddress(kind: .input, src: 4, dest: 1)!
+    eq(writes.last(where: { $0.0 == c41 })!.1, 0x4000, "mono writes R cell")
+
+    // output mute: fader + amp gain muted, fader value kept
+    let ctl5 = FirefaceController(testing: MixerState(), sink: sink)
+    _ = ctl5.setOutputFader(ch: 0, gain: 0x8000)
+    _ = ctl5.setOutputMute(ch: 0, on: true)
+    eq(writes.last(where: { $0.0 == 0x8008_0f80 })!.1, 0, "outmute writes fader 0")
+    check(ctl5.state.output[0] == 0x8000, "outmute keeps fader value")
+    _ = ctl5.setOutputMute(ch: 0, on: false)
+    eq(writes.last(where: { $0.0 == 0x8008_0f80 })!.1, 0x8000, "unmute restores out fader")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

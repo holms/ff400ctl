@@ -53,8 +53,11 @@ Menu-bar slider icon → click:
 - **Inputs / Playback** segmented tabs — one matrix row per source channel,
   one column per output channel (1–6 = Analog 1-6, 7–8 = Phones, 9–10 = SPDIF,
   11–18 = ADAT). Click a cell to toggle the crosspoint between mute and 0 dB.
-- **OUTPUT** — 18 master faders (they also sync the FF400's hardware
-  amp-gain register, like TotalMix does).
+- **INPUTS → bus** — per-input send faders into the selected monitor-bus
+  pair, with **M** (mute), **S** (exclusive solo) and **Ø** (phase invert)
+  chips per channel, and a **MONO** lock for the pair.
+- **OUTPUTS** — 18 master faders with per-channel **M** (they also sync the
+  FF400's hardware amp-gain register, like TotalMix does).
 - **Mic 1/2** — preamp gain 0–65 dB + **48V** phantom toggles;
   **In 3/4** — line gain + **PAD**/**INST** toggles.
   All four write the 3-quadlet device config block at `0x80100514`.
@@ -76,6 +79,11 @@ ffctl pad 3 on           # -20 dB pad on input 3
 ffctl instr 4 on         # instrument mode on input 4
 ffctl cfg ilevel 4dbu    # rear input reference level
 ffctl config             # show tracked config block
+ffctl mute 0 on          # mute input 1 on all outputs
+ffctl solo 0 on          # exclusive solo on the monitor bus
+ffctl phase 0 on         # phase invert (negative cell gain)
+ffctl outmute 0 on       # mute output 1
+ffctl mono on            # lock AN1/2 pair to mono
 ffctl 1to1               # playback i -> out i at 0 dB (Mac audio routing)
 ffctl mute-all           # zero every input fader
 ffctl apply              # rewrite entire saved state
@@ -105,6 +113,11 @@ phantom `q0` bits `0x01`/0x80 (mic 1/2), pads `0x100`/`0x02` (in 3/4),
 instrument `0x200`/`0x04`, in/out/phones reference levels in `q0`/`q1`,
 clock + sync + SPDIF opts + fixed `0x1e|0x80000000|0x04000000` in `q2`.
 Encoding ported from FFADO `set_hardware_params` / ASFW `EncodeConfig`.
+
+**Channel flags** (TotalMix semantics, software-side like FFADO):
+mute writes 0 but keeps the tracked fader value; phase invert writes the
+*negative* of the gain (with FFADO's `0 → -1` glitch workaround); solo is
+exclusive and applies to the monitor bus pair only; mono mirrors L→R cells.
 
 **Matrix addressing** (FF400, `block = 0x48`):
 

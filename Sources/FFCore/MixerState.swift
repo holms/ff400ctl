@@ -18,6 +18,14 @@ public struct MixerState: Codable, Equatable {
     /// Device config block (phantom, pads, levels, clock) — write-only
     /// register, so we track it and rewrite the whole block on change.
     public var config: Fireface400.ConfigBlock
+    /// Per-row flags (TotalMix channel-strip semantics, applied to every
+    /// matrix cell of the row). Phase = negative gain written to hardware.
+    public var inputMute: [Bool]
+    public var inputPhase: [Bool]
+    public var inputSolo: [Bool]
+    public var outputMute: [Bool]
+    /// When true, the monitor bus pair is mono-locked (L and R cells equal).
+    public var monoBus: Bool
 
     public init() {
         input = [UInt32](repeating: 0, count: 324)
@@ -29,6 +37,11 @@ public struct MixerState: Codable, Equatable {
         output = [UInt32](repeating: Fireface400.unityGain, count: Fireface400.channelCount)
         ampGains = [:]
         config = Fireface400.ConfigBlock()
+        inputMute = [Bool](repeating: false, count: Fireface400.channelCount)
+        inputPhase = [Bool](repeating: false, count: Fireface400.channelCount)
+        inputSolo = [Bool](repeating: false, count: Fireface400.channelCount)
+        outputMute = [Bool](repeating: false, count: Fireface400.channelCount)
+        monoBus = false
     }
 
     public static func index(src: Int, dest: Int) -> Int {
@@ -43,6 +56,15 @@ public struct MixerState: Codable, Equatable {
         ampGains = try c.decode([String: UInt32].self, forKey: .ampGains)
         config = try c.decodeIfPresent(Fireface400.ConfigBlock.self, forKey: .config)
             ?? Fireface400.ConfigBlock()
+        inputMute = try c.decodeIfPresent([Bool].self, forKey: .inputMute)
+            ?? [Bool](repeating: false, count: Fireface400.channelCount)
+        inputPhase = try c.decodeIfPresent([Bool].self, forKey: .inputPhase)
+            ?? [Bool](repeating: false, count: Fireface400.channelCount)
+        inputSolo = try c.decodeIfPresent([Bool].self, forKey: .inputSolo)
+            ?? [Bool](repeating: false, count: Fireface400.channelCount)
+        outputMute = try c.decodeIfPresent([Bool].self, forKey: .outputMute)
+            ?? [Bool](repeating: false, count: Fireface400.channelCount)
+        monoBus = try c.decodeIfPresent(Bool.self, forKey: .monoBus) ?? false
     }
 
     // MARK: - Persistence

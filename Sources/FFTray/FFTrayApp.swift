@@ -38,6 +38,11 @@ final class MixerModel: ObservableObject {
     @Published var phantom: [Bool] = [false, false]
     @Published var pad: [Bool] = [false, false]
     @Published var instr: [Bool] = [false, false]
+    @Published var inputMute = [Bool](repeating: false, count: 18)
+    @Published var inputPhase = [Bool](repeating: false, count: 18)
+    @Published var inputSolo = [Bool](repeating: false, count: 18)
+    @Published var outputMute = [Bool](repeating: false, count: 18)
+    @Published var monoBus = false
 
     private var ctl: FirefaceController?
 
@@ -50,9 +55,15 @@ final class MixerModel: ObservableObject {
             let c = try FirefaceController()
             ctl = c
             connected = true
+            syncBusPair()
             phantom = [c.config.phantom1, c.config.phantom2]
             pad = [c.config.pad3, c.config.pad4]
             instr = [c.config.instr3, c.config.instr4]
+            inputMute = c.state.inputMute
+            inputPhase = c.state.inputPhase
+            inputSolo = c.state.inputSolo
+            outputMute = c.state.outputMute
+            monoBus = c.state.monoBus
         } catch {
             lastError = "\(error)"
         }
@@ -66,6 +77,11 @@ final class MixerModel: ObservableObject {
         input[idx(src, busPairs[monitorBus].a)]
     }
 
+    func syncBusPair() {
+        let p = busPairs[monitorBus]
+        ctl?.busPair = (p.a, p.b)
+    }
+
     func setInputSend(_ src: Int, gain: UInt32) {
         let pair = busPairs[monitorBus]
         var ok = false
@@ -76,6 +92,34 @@ final class MixerModel: ObservableObject {
             input[idx(src, pair.b)] = gain; ok = true
         }
         if !ok { lastError = "send write failed" }
+    }
+
+    func setInputMute(_ src: Int, on: Bool) {
+        if ctl?.setInputMute(src: src, on: on) ?? false { inputMute[src] = on }
+        else { lastError = "write failed" }
+    }
+
+    func setInputPhase(_ src: Int, on: Bool) {
+        if ctl?.setInputPhase(src: src, on: on) ?? false { inputPhase[src] = on }
+        else { lastError = "write failed" }
+    }
+
+    func setInputSolo(_ src: Int, on: Bool) {
+        if ctl?.setInputSolo(src: src, on: on) ?? false {
+            for i in 0..<18 { inputSolo[i] = (i == src) && on }
+        } else { lastError = "write failed" }
+    }
+
+    func setOutputMute(_ ch: Int, on: Bool) {
+        if ctl?.setOutputMute(ch: ch, on: on) ?? false { outputMute[ch] = on }
+        else { lastError = "write failed" }
+    }
+
+    func setMono(_ on: Bool) {
+        if ctl?.setMonoBus(on: on) ?? false {
+            monoBus = on
+            if on, let s = ctl?.state { input = s.input }
+        } else { lastError = "write failed" }
     }
 
     func inputSendDB(_ src: Int) -> Double {

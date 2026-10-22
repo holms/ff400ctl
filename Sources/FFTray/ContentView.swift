@@ -174,8 +174,12 @@ struct ContentView: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(width: 110)
+                .onChange(of: model.monitorBus) { _ in model.syncBusPair() }
                 Text("send level")
                     .font(.caption2).foregroundStyle(Theme.secondary)
+                FlagButton("MONO", on: model.monoBus, color: Theme.inputOn) {
+                    model.setMono(!model.monoBus)
+                }
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 2) {
@@ -193,6 +197,17 @@ struct ContentView: View {
                                     model.setInputSend(src, gain: Fireface400.gain(fromDB: db))
                                 }
                             })
+                        VStack(spacing: 2) {
+                            FlagButton("M", on: model.inputMute[src], color: .orange) {
+                                model.setInputMute(src, on: !model.inputMute[src])
+                            }
+                            FlagButton("S", on: model.inputSolo[src], color: .yellow) {
+                                model.setInputSolo(src, on: !model.inputSolo[src])
+                            }
+                            FlagButton("Ø", on: model.inputPhase[src], color: Theme.pbOn) {
+                                model.setInputPhase(src, on: !model.inputPhase[src])
+                            }
+                        }
                     }
                 }
                 .padding(.vertical, 2)
@@ -224,6 +239,9 @@ struct ContentView: View {
                                     model.setOutput(ch, gain: Fireface400.gain(fromDB: db))
                                 }
                             })
+                        FlagButton("M", on: model.outputMute[ch], color: .orange) {
+                            model.setOutputMute(ch, on: !model.outputMute[ch])
+                        }
                     }
                 }
                 .padding(.vertical, 2)
