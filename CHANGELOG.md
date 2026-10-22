@@ -1,0 +1,80 @@
+# Changelog
+
+All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+## [0.3.0] - 2026-10-22
+
+### Added
+- Channel flags with TotalMix semantics (FFADO `setMixerGain` model):
+  - **Mute** per input row — writes 0 to all cells, keeps tracked fader value
+  - **Solo** — exclusive, applies to the monitor bus pair only
+  - **Phase invert** per input row — negative cell gain, incl. FFADO's
+    `0 → -1` glitch workaround for zero cells
+  - **Output mute** per channel — suppresses master fader + hw amp gain
+  - **MONO** bus lock — mirrors L cells into R on the selected pair
+- `writeSink` test hook — `FirefaceController` is unit-testable without
+  hardware (`init(testing:sink:)`)
+- CLI: `mute`, `solo`, `phase`, `outmute`, `mono`
+- Tray UI: M/S/Ø chips under input faders, M under outputs, MONO toggle
+- 14 new unit checks (97 total) asserting exact written cell values
+
+### Changed
+- `setInputFader` / `setOutputFader` now write the *effective* cell value
+  honoring mute/solo/phase flags instead of the raw gain
+
+## [0.2.0] - 2026-10-22
+
+### Added
+- Device configuration block support — the 3-quadlet write-only register
+  at `0x80100514`, encoded per FFADO `set_hardware_params` / ASFW
+  `EncodeConfig`:
+  - **Phantom power** (+48V) toggles for mic inputs 1/2
+  - **PAD** and **INST** toggles for inputs 3/4
+  - Input/output/phones reference levels, clock master, sync ref, SPDIF opts
+- `AsyncBlockWrite` (selector 45) support in `ASFWClient`
+- CLI: `phantom`, `pad`, `instr`, `cfg`, `config`
+- Tray UI: 48V chips under Mic faders, PAD/INST chips under In 3/4
+- 13 new unit checks (83 total), incl. the FFADO reference vector `0x00020811`
+- Config defaults match observed status mirror: clockMaster, spdifPro,
+  syncRef=adat1
+
+## [0.1.0] - 2026-10-22
+
+### Added
+- Initial release — RME Fireface 400 mixer control on modern macOS through
+  the ASFW DriverKit user client, no TotalMix / legacy RME driver needed
+- `FFCore`: `ASFWClient` (IOKit user-client wrapper, verified async writes),
+  `Fireface400` (register map + matrix math ported from FFADO
+  `fireface_hw.cpp`), `MixerState` (persisted state), `FirefaceController`
+- `ffctl` CLI: `mon`, `mix`, `pb`, `outvol`, `gain`, `1to1`, `mute-all`,
+  `apply`, `state`
+- `FFTray.app` menu-bar app (ASFW Studio Dark style): 18×18 input→output /
+  playback→output routing matrix, input send faders with monitor-bus
+  picker, output master faders, mic/line preamp gains, click-to-type dB
+  values
+- `fftests`: self-contained unit-test runner (70 checks — no XCTest/Xcode
+  needed)
+- Makefile: build, test, install; ad-hoc codesign with the
+  `net.asfw.driver` userclient-access entitlement
+
+### Verified on hardware
+- Input→output matrix writes land (`ackComplete`) — input 1 monitored to
+  analog outs 1/2 confirmed by ear
+- Playback 1:1 matrix, output faders, amp gains
+- Correct node addressing: RME registers are 48-bit node offsets
+  (`addrHigh=0`), values are little-endian quadlets
+
+### Known limitations
+- User-client async *reads* never complete (AR responses unmatched) —
+  mixer state is tracked in software, like FFADO
+- Mixer RAM + config register are volatile — power cycle restores flash
+  state; use "Re-apply mix"
+- Rapid transaction bursts can wedge the device's AR engine — keep write
+  bursts small
+
+[Unreleased]: https://github.com/holms/ff400ctl/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/holms/ff400ctl/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/holms/ff400ctl/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/holms/ff400ctl/releases/tag/v0.1.0
