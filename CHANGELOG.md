@@ -5,6 +5,7 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- Dependabot keeps GitHub Actions versions current (weekly PRs)
 - GitHub issue templates (bug report / feature request) and
   CONTRIBUTING.md
 - Install docs (README "Install" + DMG INSTALL.txt): Gatekeeper bypass
