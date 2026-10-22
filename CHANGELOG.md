@@ -29,6 +29,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   hotkey scripts)
 
 ### Fixed
+- Dock/Cmd-Tab showed a generic icon for the detached window (stale
+  LaunchServices cache) — the app now sets its icon explicitly at launch
 - Preamp (Mic 1/2, In 3/4) value labels were clipped to "0.0…" — the
   40pt fader column couldn't fit e.g. "10.5 dB"; VFader now takes a
   column width and the preamp faders use 64pt

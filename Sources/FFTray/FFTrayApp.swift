@@ -24,6 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // The Dock/Cmd-Tab icon for an LSUIElement app that flips to
+        // .regular can come from a stale LaunchServices cache — set it
+        // explicitly from the bundled AppIcon.icns.
+        if let icon = NSImage(named: "AppIcon") { NSApp.applicationIconImage = icon }
         let t0 = Date()
         let hosting = NSHostingController(
             rootView: ContentView().environmentObject(model))
