@@ -16,7 +16,7 @@ TotalMix/FFADO use, through ASFW's raw `AsyncWrite` user-client method.
 └─────────────┘                         └──────────────┘               └───────────┘
 ```
 
-![FFTray — FF400 mixer in the menu bar](docs/fftray.png)
+![FFTray — FF400 mixer, detached window showing all 18 channels](docs/fftray.png)
 
 ## What's inside
 
