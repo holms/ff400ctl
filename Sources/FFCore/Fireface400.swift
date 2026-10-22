@@ -106,9 +106,9 @@ public enum Fireface400 {
     /// Register value for `gainRegister`: `(index << 16) | devval`.
     ///
     /// - mic 1/2:  `dB` is gain in dB (0–65); below 10 dB selects 0.
-    /// - inputs 3/4: `dB` is in units of 0.5 dB (caller passes dB×2 semantics via `dB` already doubled? —
-    ///   FFADO passes the raw dB value; device units are 0.5 dB).
-    /// - outputs/phones/spdif/adat: `dB` is attenuation; `devval = 6 - round(dB*2)`,
+    /// - inputs 3/4: device units are 0.5 dB; the caller passes dB.
+    /// - outputs/phones/spdif/adat: `dB` is attenuation in whole dB;
+    ///   `devval = 6 - round(dB)` (FFADO `set_hardware_ampgain`),
     ///   >0x35 is replaced by 0x3f (mute). 0 dB → 6.
     public static func ampGainValue(index: Int, dB: Double) -> UInt32? {
         guard (0..<22).contains(index) else { return nil }
@@ -118,7 +118,7 @@ public enum Fireface400 {
         } else if index <= AmpGain.input4.rawValue {
             devval = dB.isFinite ? UInt32(clamping: Int((dB * 2).rounded())) : 0
         } else {
-            var v = dB.isFinite ? 6 - Int((dB * 2).rounded()) : 0x3f
+            var v = dB.isFinite ? 6 - Int(dB.rounded()) : 0x3f
             if v > 53 { v = 0x3f }            // mute
             if v < 0 { v = 0 }                // device maximum
             devval = UInt32(v)

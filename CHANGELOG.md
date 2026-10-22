@@ -11,6 +11,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 - Shared coalescing keys dropped distinct writes: phantom/pad/instr all
   used key "cfg", and both channels of a stereo pair used "out.<pair>" —
   keys are now per-flag / per-channel
+- Output amp-gain encoding was 2× the fader dB — now `devval = 6 - round(dB)`
+  (whole dB), matching FFADO's `set_hardware_ampgain`
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)
