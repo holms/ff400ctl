@@ -28,6 +28,7 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   surface "not connected — change not applied"
 - `ASFWClient` leaked a mach receive port and a shared-memory mapping per
   connection; both are released in `deinit`
+- `ffctl outvol` ignored the stereo link — the peer channel follows now
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)

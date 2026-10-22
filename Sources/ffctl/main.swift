@@ -92,6 +92,9 @@ func run(_ a: ArraySlice<String>, _ ctl: FirefaceController) -> Int32 {
               let g = Fireface400.parseGainArgument(a[2], current: ctl.state.output[ch])
         else { usage() }
         guard ok(ctl.setOutputFader(ch: ch, gain: g), "output fader") else { return 1 }
+        if ctl.state.outputStereo[ch / 2] {
+            _ = ok(ctl.setOutputFader(ch: ch ^ 1, gain: g), "output fader (linked peer)")
+        }
     case "phantom":
         guard a.count > 2, let ch = Int(a[1]), (1...2).contains(ch),
               let on = onOff(a[2]) else { usage() }

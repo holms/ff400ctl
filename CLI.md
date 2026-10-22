@@ -77,7 +77,7 @@ ffctl stereo <pair> <on|off> # stereo-link an output pair (0-8:
 - `mute` writes 0 to hardware but keeps your fader value — unmute restores it.
 - `stereo` links a pair's faders: in FFTray the two columns merge into
   one fader and writes are mirrored to both channels — TotalMix's stereo
-  button. Persisted in state, honored by the tray app.
+  button. Persisted in state, honored by the tray app and `ffctl outvol`.
 - `solo` is exclusive: engaging one input silences all others **on the
   monitor bus pair only** (AN1/2). Other outputs are untouched.
 - `phase` writes the negative of the fader (FFADO convention). On a 0
