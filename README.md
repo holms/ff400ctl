@@ -68,7 +68,9 @@ Menu-bar slider icon → click:
   the unit restores its flash-stored mix on every power cycle); output
   amp gains are re-derived from the faders rather than replayed raw.
 - **Save state** — persists the intended mix to
-  `~/Library/Application Support/ff400ctl/state.json`.
+  `~/Library/Application Support/ff400ctl/state.json`. Writes auto-save
+  (coalesced) and the file is watched, so `ffctl` changes show up in the
+  tray live.
 
 ### ffctl
 

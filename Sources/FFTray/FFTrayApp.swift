@@ -47,6 +47,16 @@ final class MixerModel: NSObject, ObservableObject {
 
     private var ctl: FirefaceController?
     private let hwq = WriteCoalescer()
+    /// Watches the state.json directory for writes by ffctl (atomic saves
+    /// replace the file, so the directory is watched, not the file).
+    private var stateWatcher: DispatchSourceFileSystemObject?
+    private var stateWatcherFD: Int32 = -1
+    private var reloadScheduled = false
+    /// State at our own most recent save. Touched ONLY on the hw queue —
+    /// lets the file watcher tell our autosaves (and files read while a
+    /// newer save is still queued behind the reload) from real external
+    /// changes.
+    private var lastSaved: MixerState?
 
     override init() {
         let s = MixerState.load()
@@ -60,31 +70,87 @@ final class MixerModel: NSObject, ObservableObject {
             connected = true
             let p = busPairs[monitorBus]
             ctl?.busPair = (p.a, p.b)
-            phantom = [c.config.phantom1, c.config.phantom2]
-            pad = [c.config.pad3, c.config.pad4]
-            instr = [c.config.instr3, c.config.instr4]
-            inputMute = c.state.inputMute
-            inputPhase = c.state.inputPhase
-            inputSolo = c.state.inputSolo
-            outputMute = c.state.outputMute
-            monoBus = c.state.monoBus
-            outputStereo = c.state.outputStereo
-            micGain = [Fireface400.ampGainDB(index: 0, devval: c.state.ampGains["0"] ?? 0) ?? 0,
-                       Fireface400.ampGainDB(index: 1, devval: c.state.ampGains["1"] ?? 0) ?? 0]
-            inGain = [Fireface400.ampGainDB(index: 2, devval: c.state.ampGains["2"] ?? 0) ?? 0,
-                      Fireface400.ampGainDB(index: 3, devval: c.state.ampGains["3"] ?? 0) ?? 0]
+            publish(c.state)
+            lastSaved = c.state
         } catch {
             lastError = "\(error)"
         }
+        watchStateFile()
         NotificationCenter.default.addObserver(
             self, selector: #selector(appWillTerminate),
             name: NSApplication.willTerminateNotification, object: nil)
     }
 
+    deinit {
+        stateWatcher?.cancel()
+    }
+
+    /// Push a MixerState into every @Published property.
+    private func publish(_ s: MixerState) {
+        input = s.input
+        playback = s.playback
+        output = s.output
+        inputMute = s.inputMute
+        inputPhase = s.inputPhase
+        inputSolo = s.inputSolo
+        outputMute = s.outputMute
+        monoBus = s.monoBus
+        outputStereo = s.outputStereo
+        phantom = [s.config.phantom1, s.config.phantom2]
+        pad = [s.config.pad3, s.config.pad4]
+        instr = [s.config.instr3, s.config.instr4]
+        micGain = [Fireface400.ampGainDB(index: 0, devval: s.ampGains["0"] ?? 0) ?? 0,
+                   Fireface400.ampGainDB(index: 1, devval: s.ampGains["1"] ?? 0) ?? 0]
+        inGain = [Fireface400.ampGainDB(index: 2, devval: s.ampGains["2"] ?? 0) ?? 0,
+                  Fireface400.ampGainDB(index: 3, devval: s.ampGains["3"] ?? 0) ?? 0]
+    }
+
+    private func watchStateFile() {
+        let dir = MixerState.storeURL.deletingLastPathComponent()
+        stateWatcherFD = open(dir.path, O_EVTONLY)
+        guard stateWatcherFD >= 0 else { return }
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: stateWatcherFD, eventMask: .write, queue: .main)
+        let fd = stateWatcherFD
+        src.setEventHandler { [weak self] in self?.stateFileChanged() }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        stateWatcher = src
+    }
+
+    /// Debounce rapid save bursts (~200 ms) before reloading.
+    private func stateFileChanged() {
+        if reloadScheduled { return }
+        reloadScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self else { return }
+            self.reloadScheduled = false
+            self.reloadStateIfChanged()
+        }
+    }
+
+    /// Re-read state.json on the hw queue; adopt it when it differs from
+    /// the controller's tracked state (ffctl wrote the hardware already —
+    /// just realign the model; our own autosaves compare equal).
+    private func reloadStateIfChanged() {
+        hwq.submit("reload") { [weak self] in
+            guard let self, let c = self.ctl else { return }
+            let s = MixerState.load()
+            // Skip our own saves — and stale ones: a save queued behind
+            // this reload hasn't landed yet, so the file can be older
+            // than c.state; restoring it would rewind a live drag.
+            guard s != c.state, s != self.lastSaved else { return }
+            c.restoreState(s)
+            self.lastSaved = s
+            NSLog("FFTray: reloaded state changed externally")
+            DispatchQueue.main.async { self.publish(s) }
+        }
+    }
+
     /// Flush pending writes and persist state before the process exits.
     @objc private func appWillTerminate(_ note: Notification) {
         hwq.waitUntilIdle()
-        ctl?.saveState()
+        if let c = ctl { c.saveState(); lastSaved = c.state }
     }
 
     /// Run a hardware operation on the serial write queue; report failure
@@ -102,7 +168,7 @@ final class MixerModel: NSObject, ObservableObject {
             if !work(c) {
                 DispatchQueue.main.async { self.lastError = failMsg }
             }
-            self.hwq.submit("save") { c.saveState() }
+            self.hwq.submit("save") { c.saveState(); self.lastSaved = c.state }
         }
     }
 
@@ -273,7 +339,10 @@ final class MixerModel: NSObject, ObservableObject {
     }
 
     func save() {
-        hwq.submit("save") { [weak self] in self?.ctl?.saveState() }
+        hwq.submit("save") { [weak self] in
+            guard let c = self?.ctl else { return }
+            c.saveState(); self?.lastSaved = c.state
+        }
     }
 
     // MARK: - Detached window

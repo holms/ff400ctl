@@ -52,6 +52,11 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ### Added
 - **Detach** button: opens the mixer in a normal titled window that stays
   open while you work in other apps (the tray panel closes on focus loss)
+- FFTray watches `state.json`'s directory and live-reloads state changed
+  by `ffctl` (no re-apply — the CLI already wrote the hardware). A
+  `lastSaved` guard distinguishes external edits from the app's own
+  autosaves, so a reload racing a fader drag can't roll the controller
+  back to an older save
 
 ### Changed
 - Fader value labels enlarged 9pt → 11pt (wider edit field)
