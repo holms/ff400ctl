@@ -29,8 +29,11 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 - `ASFWClient` leaked a mach receive port and a shared-memory mapping per
   connection; both are released in `deinit`
 - `ffctl outvol` ignored the stereo link — the peer channel follows now
+- Fader value labels (38pt) overlapped neighboring 30pt columns —
+  columns widened to 40pt
 
 ### Changed
+- Fader value labels enlarged 9pt → 11pt (wider edit field)
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)
 
 ## [0.4.0] - 2026-10-23

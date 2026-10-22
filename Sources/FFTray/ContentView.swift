@@ -2,7 +2,7 @@ import SwiftUI
 import FFCore
 
 private let cellSize: CGFloat = 26
-private let faderColW: CGFloat = 30
+private let faderColW: CGFloat = 40
 private let faderTravel: CGFloat = 96
 private let labelWidth: CGFloat = 56
 
@@ -90,7 +90,7 @@ struct VFader: View {
                 .foregroundStyle(Theme.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            EditableValue(text: display, width: 38, onCommit: onText)
+            EditableValue(text: display, width: faderColW - 2, onCommit: onText)
         }
         .frame(width: faderColW)
     }
