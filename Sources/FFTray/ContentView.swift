@@ -418,36 +418,56 @@ private struct MatrixView: View, Equatable {
     let onColor: Color
     let onToggle: (Int, Int) -> Void
 
+    private let n = Fireface400.channelCount
+    private let cellH: CGFloat = 18
+    private let gap: CGFloat = 2
+
+    private var gridW: CGFloat { CGFloat(n) * (cellSize + gap) - gap }
+    private var gridH: CGFloat { CGFloat(n) * (cellH + gap) - gap }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 2) {
+        HStack(alignment: .top, spacing: gap) {
+            VStack(alignment: .leading, spacing: gap) {
                 Text("IN \\ OUT")
                     .font(.system(size: 8, design: .monospaced))
                     .foregroundStyle(Theme.secondary)
-                    .frame(width: labelWidth, alignment: .leading)
-                ForEach(0..<Fireface400.channelCount, id: \.self) { d in
-                    Text("\(d + 1)")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(Theme.secondary)
-                        .frame(width: cellSize)
-                }
-            }
-            ForEach(0..<Fireface400.channelCount, id: \.self) { src in
-                HStack(spacing: 2) {
+                    .frame(width: labelWidth, height: 14, alignment: .leading)
+                ForEach(0..<n, id: \.self) { src in
                     Text(rowNames[src])
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(Theme.secondary)
-                        .frame(width: labelWidth, alignment: .leading)
-                    ForEach(0..<Fireface400.channelCount, id: \.self) { dest in
-                        let i = MixerState.index(src: src, dest: dest)
-                        let on = i < cells.count && cells[i] != 0
-                        Button { onToggle(src, dest) } label: {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(on ? onColor : Theme.offCell)
-                                .frame(width: cellSize - 4, height: 18)
+                        .frame(width: labelWidth, height: cellH, alignment: .leading)
+                }
+            }
+            VStack(alignment: .leading, spacing: gap) {
+                HStack(spacing: gap) {
+                    ForEach(0..<n, id: \.self) { d in
+                        Text("\(d + 1)")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(Theme.secondary)
+                            .frame(width: cellSize, height: 14)
+                    }
+                }
+                Canvas { ctx, _ in
+                    for src in 0..<n {
+                        for dest in 0..<n {
+                            let i = MixerState.index(src: src, dest: dest)
+                            let on = i < cells.count && cells[i] != 0
+                            let rect = CGRect(
+                                x: CGFloat(dest) * (cellSize + gap) + 2,
+                                y: CGFloat(src) * (cellH + gap),
+                                width: cellSize - 4, height: cellH)
+                            ctx.fill(Path(roundedRect: rect, cornerRadius: 3),
+                                     with: .color(on ? onColor : Theme.offCell))
                         }
-                        .buttonStyle(.plain)
-                        .frame(width: cellSize)
+                    }
+                }
+                .frame(width: gridW, height: gridH)
+                .onTapGesture(coordinateSpace: .local) { p in
+                    if let h = MatrixHitTest.cell(at: p.x, y: p.y,
+                                                  cellW: cellSize, cellH: cellH,
+                                                  gap: gap, count: n) {
+                        onToggle(h.row, h.col)
                     }
                 }
             }

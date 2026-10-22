@@ -302,7 +302,6 @@ do {
     check(back.outputStereo[0] == true, "stereo link survives round-trip")
     s = back
     s.outputStereo = []
-    // stale file with short array is tolerated on decode path? (not: decodeIfPresent keeps it)
 }
 
 // MARK: - WriteCoalescer (same-key coalescing, FIFO, position-preserving replace)
@@ -351,6 +350,7 @@ do {
     wq4.waitUntilIdle()
     check(true, "waitUntilIdle on empty queue returns")
 }
+
 // MARK: - ampGainDB inverse
 
 do {
@@ -370,6 +370,7 @@ do {
         eq(Fireface400.ampGainDB(index: 4, devval: rv & 0xffff), -10, "out round-trip")
     }
 }
+
 // MARK: - setBusPair (solo follows the bus)
 
 do {
@@ -390,6 +391,7 @@ do {
     check(!c5.setBusPair(a: 18, b: 0), "setBusPair a=18 rejected")
     check(!c5.setBusPair(a: 0, b: -1), "setBusPair b=-1 rejected")
 }
+
 // MARK: - MixerState.normalized
 
 do {
@@ -408,6 +410,7 @@ do {
     over.outputMute = [Bool](repeating: true, count: 30)
     eq(over.normalized().outputMute.count, 18, "outputMute truncated to 18")
 }
+
 // MARK: - Mono sum semantics (inputs + playback, non-destructive)
 
 do {
@@ -502,6 +505,27 @@ do {
           "stale raw amp gain never written")
     let g0 = gains.last(where: { ($0.1 >> 16) == 0 })!
     eq(g0.1 & 0xffff, 20, "mic1 amp gain still replayed")
+}
+
+// MARK: - MatrixHitTest (canvas grid tap mapping)
+
+do {
+    // cellW 26, cellH 18, gap 2 -> pitch 28×20
+    func hit(_ x: Double, _ y: Double) -> (row: Int, col: Int)? {
+        MatrixHitTest.cell(at: x, y: y, cellW: 26, cellH: 18, gap: 2, count: 18)
+    }
+    eq(hit(13, 9)?.row, 0, "center of cell (0,0) row")
+    eq(hit(13, 9)?.col, 0, "center of cell (0,0) col")
+    eq(hit(17 * 28 + 13, 17 * 20 + 9)?.row, 17, "center of cell (17,17) row")
+    eq(hit(17 * 28 + 13, 17 * 20 + 9)?.col, 17, "center of cell (17,17) col")
+    check(hit(27, 9) == nil, "tap in column gap -> nil")
+    check(hit(13, 19) == nil, "tap in row gap -> nil")
+    check(hit(-1, 9) == nil, "negative x -> nil")
+    check(hit(13, -1) == nil, "negative y -> nil")
+    check(hit(18 * 28, 9) == nil, "beyond grid -> nil")
+    check(hit(18 * 28, 18 * 20) == nil, "past last cell -> nil")
+    eq(hit(17 * 28 + 25, 17 * 20 + 17)?.row, 17, "just inside last row")
+    eq(hit(17 * 28 + 25, 17 * 20 + 17)?.col, 17, "just inside last col")
 }
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

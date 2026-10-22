@@ -65,6 +65,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   view on every click (~1.3 s on a MacPro6,1). Replaced with a persistent
   `NSStatusItem` + `NSPopover` whose content is built and laid out once
   at launch (build time logged under `net.holms.fftray`)
+- Routing matrix drawn with a single `Canvas` + tap hit-testing
+  (`MatrixHitTest` in FFCore) instead of 324 SwiftUI buttons
 
 ## [0.4.0] - 2026-10-23
 
