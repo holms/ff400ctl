@@ -87,6 +87,7 @@ struct VFader: View {
     let format: (Double) -> String
     let onLive: (Double) -> Void
     let onText: (String) -> Void
+    var colWidth: CGFloat = faderColW
     @State private var live: Double?
 
     private var dragBinding: Binding<Double> {
@@ -110,16 +111,16 @@ struct VFader: View {
             }
             .frame(width: faderTravel)
             .rotationEffect(.degrees(-90))
-            .frame(width: faderColW - 6, height: faderTravel)
+            .frame(width: colWidth - 6, height: faderTravel)
 
             Text(title)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            EditableValue(text: format(live ?? value), width: faderColW - 2, onCommit: onText)
+            EditableValue(text: format(live ?? value), width: colWidth - 2, onCommit: onText)
         }
-        .frame(width: faderColW)
+        .frame(width: colWidth)
     }
 }
 
@@ -385,7 +386,8 @@ struct ContentView: View {
                             range: 0...65, step: 1,
                             format: { String(format: "%.0f dB", $0) },
                             onLive: { model.previewMicGain(i, dB: $0) },
-                            onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } })
+                            onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } },
+                            colWidth: 64)
                         FlagButton("48V", on: model.phantom[i], color: .yellow) {
                             model.setPhantom(i, on: !model.phantom[i])
                         }
@@ -402,7 +404,8 @@ struct ContentView: View {
                             range: 0...30, step: 0.5,
                             format: { String(format: "%.1f dB", $0) },
                             onLive: { model.previewInGain(i, dB: $0) },
-                            onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } })
+                            onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } },
+                            colWidth: 64)
                         HStack(spacing: 2) {
                             FlagButton("PAD", on: model.pad[i], color: .orange) {
                                 model.setPad(i, on: !model.pad[i])

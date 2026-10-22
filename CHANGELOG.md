@@ -12,6 +12,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   hotkey scripts)
 
 ### Fixed
+- Preamp (Mic 1/2, In 3/4) value labels were clipped to "0.0…" — the
+  40pt fader column couldn't fit e.g. "10.5 dB"; VFader now takes a
+  column width and the preamp faders use 64pt
 - Unreadable channel labels: fader titles 8pt (scaled down to ~5pt) →
   12pt semibold; matrix row names 9 → 11pt, column numbers 8 → 11pt;
   strip hint lines 8 → 10pt
