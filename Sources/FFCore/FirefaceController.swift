@@ -96,3 +96,46 @@ public final class FirefaceController {
 
     public func saveState() { state.save() }
 }
+
+// MARK: - Device config block (phantom, pads, levels, clock)
+
+extension FirefaceController {
+
+    /// Current tracked config (write-only register — can't be read back).
+    public var config: Fireface400.ConfigBlock { state.config }
+
+    /// Write the whole 3-quadlet config block to the device.
+    @discardableResult
+    public func writeConfig(_ cfg: Fireface400.ConfigBlock) -> Bool {
+        let ok = client.writeBlock(node: nodeID, address: Fireface400.configReg,
+                                   payload: cfg.payload, verify: verifyWrites)
+        onWrite?(Fireface400.configReg, ok)
+        if ok { state.config = cfg }
+        return ok
+    }
+
+    /// Toggle +48V phantom on mic input `ch` (0 or 1).
+    @discardableResult
+    public func setPhantom(ch: Int, on: Bool) -> Bool {
+        guard (0...1).contains(ch) else { return false }
+        var cfg = state.config
+        if ch == 0 { cfg.phantom1 = on } else { cfg.phantom2 = on }
+        return writeConfig(cfg)
+    }
+
+    /// Toggle pad (-20 dB) on input 3/4 (`ch` = 2 or 3).
+    @discardableResult
+    public func setPad(ch: Int, on: Bool) -> Bool {
+        var cfg = state.config
+        if ch == 2 { cfg.pad3 = on } else if ch == 3 { cfg.pad4 = on } else { return false }
+        return writeConfig(cfg)
+    }
+
+    /// Toggle instrument mode on input 3/4 (`ch` = 2 or 3).
+    @discardableResult
+    public func setInstrument(ch: Int, on: Bool) -> Bool {
+        var cfg = state.config
+        if ch == 2 { cfg.instr3 = on } else if ch == 3 { cfg.instr4 = on } else { return false }
+        return writeConfig(cfg)
+    }
+}

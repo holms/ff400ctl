@@ -35,6 +35,9 @@ final class MixerModel: ObservableObject {
     @Published var output: [UInt32]
     @Published var micGain: [Double] = [0, 0]
     @Published var inGain: [Double] = [0, 0]
+    @Published var phantom: [Bool] = [false, false]
+    @Published var pad: [Bool] = [false, false]
+    @Published var instr: [Bool] = [false, false]
 
     private var ctl: FirefaceController?
 
@@ -47,6 +50,9 @@ final class MixerModel: ObservableObject {
             let c = try FirefaceController()
             ctl = c
             connected = true
+            phantom = [c.config.phantom1, c.config.phantom2]
+            pad = [c.config.pad3, c.config.pad4]
+            instr = [c.config.instr3, c.config.instr4]
         } catch {
             lastError = "\(error)"
         }
@@ -114,6 +120,21 @@ final class MixerModel: ObservableObject {
         let idx = i == 0 ? Fireface400.AmpGain.input3.rawValue : Fireface400.AmpGain.input4.rawValue
         if ctl?.setAmpGain(index: idx, dB: dB) ?? false { inGain[i] = dB }
         else { lastError = "write failed" }
+    }
+
+    func setPhantom(_ i: Int, on: Bool) {
+        if ctl?.setPhantom(ch: i, on: on) ?? false { phantom[i] = on }
+        else { lastError = "config write failed" }
+    }
+
+    func setPad(_ i: Int, on: Bool) {
+        if ctl?.setPad(ch: i + 2, on: on) ?? false { pad[i] = on }
+        else { lastError = "config write failed" }
+    }
+
+    func setInstr(_ i: Int, on: Bool) {
+        if ctl?.setInstrument(ch: i + 2, on: on) ?? false { instr[i] = on }
+        else { lastError = "config write failed" }
     }
 
     // MARK: - Bulk

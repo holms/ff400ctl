@@ -87,6 +87,21 @@ public final class ASFWClient {
     @discardableResult
     public func asyncWrite(destinationID: UInt16, addressHigh: UInt16,
                            addressLow: UInt32, payload: Data) -> [Int: UInt16] {
+        rawWrite(selector: Method.asyncWrite, destinationID: destinationID,
+                 addressHigh: addressHigh, addressLow: addressLow, payload: payload)
+    }
+
+    /// Issue an async *block* write (selector 45) — one transaction carrying
+    /// more than 4 bytes, e.g. the FF400's 3-quadlet config block.
+    @discardableResult
+    public func asyncBlockWrite(destinationID: UInt16, addressHigh: UInt16,
+                                addressLow: UInt32, payload: Data) -> [Int: UInt16] {
+        rawWrite(selector: Method.asyncBlockWrite, destinationID: destinationID,
+                 addressHigh: addressHigh, addressLow: addressLow, payload: payload)
+    }
+
+    private func rawWrite(selector: Method, destinationID: UInt16, addressHigh: UInt16,
+                          addressLow: UInt32, payload: Data) -> [Int: UInt16] {
         var scalars: [UInt64] = [UInt64(destinationID), UInt64(addressHigh),
                                  UInt64(addressLow), UInt64(payload.count)]
         var handles: [Int: UInt16] = [:]
@@ -95,7 +110,7 @@ public final class ASFWClient {
             var outCount: UInt32 = 1
             let kr = payload.withUnsafeBytes { p in
                 scalars.withUnsafeMutableBufferPointer { s in
-                    IOConnectCallMethod(conn, Method.asyncWrite.rawValue,
+                    IOConnectCallMethod(conn, selector.rawValue,
                                         s.baseAddress, 4,
                                         p.baseAddress, p.count,
                                         &out, &outCount, nil, nil)
@@ -147,6 +162,20 @@ public final class ASFWClient {
                              value: UInt32, verify: Bool = true) -> Bool {
         let handles = asyncWrite(destinationID: node, addressHigh: 0,
                                  addressLow: address, payload: Fireface400.payload(for: value))
+        return verifyHandles(handles, verify: verify)
+    }
+
+    /// Convenience: write a multi-quadlet block to a node register
+    /// (e.g. the 3-quadlet config block at 0x80100514).
+    @discardableResult
+    public func writeBlock(node: UInt16 = 0xffc0, address: UInt32,
+                           payload: Data, verify: Bool = true) -> Bool {
+        let handles = asyncBlockWrite(destinationID: node, addressHigh: 0,
+                                      addressLow: address, payload: payload)
+        return verifyHandles(handles, verify: verify)
+    }
+
+    private func verifyHandles(_ handles: [Int: UInt16], verify: Bool) -> Bool {
         guard !handles.isEmpty else { return false }
         if !verify { return true }
         for (conn, handle) in handles {

@@ -55,7 +55,9 @@ Menu-bar slider icon → click:
   11–18 = ADAT). Click a cell to toggle the crosspoint between mute and 0 dB.
 - **OUTPUT** — 18 master faders (they also sync the FF400's hardware
   amp-gain register, like TotalMix does).
-- **Mic 1/2** — preamp gain 0–65 dB; **In 3/4** — line gain.
+- **Mic 1/2** — preamp gain 0–65 dB + **48V** phantom toggles;
+  **In 3/4** — line gain + **PAD**/**INST** toggles.
+  All four write the 3-quadlet device config block at `0x80100514`.
 - **Re-apply mix** — rewrites all tracked cells (mixer RAM is volatile —
   the unit restores its flash-stored mix on every power cycle).
 - **Save state** — persists the intended mix to
@@ -69,6 +71,11 @@ ffctl mix 0 0 -6dB       # one input fader cell
 ffctl pb 0 0 0x8000      # playback (Mac audio) fader cell
 ffctl outvol 0 -3dB      # output master fader (syncs hw amp gain too)
 ffctl gain 0 20          # mic 1 preamp to 20 dB
+ffctl phantom 1 on       # +48V on mic input 1
+ffctl pad 3 on           # -20 dB pad on input 3
+ffctl instr 4 on         # instrument mode on input 4
+ffctl cfg ilevel 4dbu    # rear input reference level
+ffctl config             # show tracked config block
 ffctl 1to1               # playback i -> out i at 0 dB (Mac audio routing)
 ffctl mute-all           # zero every input fader
 ffctl apply              # rewrite entire saved state
@@ -91,6 +98,13 @@ historically cooperated with:
 | gain register | `0x801c0180` | hardware amp gains `(index<<16)\|devval` |
 | channel mute | `0x801c0000` | 28-quadlet PCM fetch mask |
 | output rec | `0x801c0080` | 28-quadlet output record flags |
+| config block | `0x80100514` | 3 quadlets, write-only: phantom, pads, inst, levels, clock |
+
+**Config block** (`0x80100514`, 3 quadlets, block write / selector 45):
+phantom `q0` bits `0x01`/0x80 (mic 1/2), pads `0x100`/`0x02` (in 3/4),
+instrument `0x200`/`0x04`, in/out/phones reference levels in `q0`/`q1`,
+clock + sync + SPDIF opts + fixed `0x1e|0x80000000|0x04000000` in `q2`.
+Encoding ported from FFADO `set_hardware_params` / ASFW `EncodeConfig`.
 
 **Matrix addressing** (FF400, `block = 0x48`):
 

@@ -122,5 +122,46 @@ do {
 
 // MARK: -
 
+// MARK: - Config block encoding (FFADO set_hardware_params / ASFW EncodeConfig)
+
+do {
+    var c = Fireface400.ConfigBlock()
+    var q = c.quadlets
+    // defaults: +4dBu in/out/phones, clock master, wclk sync, spdifPro
+    eq(q.0, 0x0000_0810, "config q0 default")
+    eq(q.1, 0x0000_001a, "config q1 default")
+    eq(q.2, 0x8400_003f, "config q2 default")
+
+    // ffado test vector: 0x00020811 = phones higain + out +4dBu + in +4dBu + phantom mic1
+    c.phonesLevel = .lowGain   // "high gain" phones
+    c.phantom1 = true
+    eq(c.quadlets.0, 0x0002_0811, "config q0 phantom1 + phones higain (ffado vector)")
+    c.phantom1 = false
+    eq(c.quadlets.0, 0x0002_0810, "config q0 phantom off (ffado vector)")
+
+    c = Fireface400.ConfigBlock()
+    c.phantom2 = true
+    check(c.quadlets.0 & 0x80 != 0, "phantom2 sets q0 bit7")
+    c = Fireface400.ConfigBlock()
+    c.pad3 = true; c.pad4 = true
+    check(c.quadlets.0 & 0x100 != 0, "pad3 sets q0 bit8")
+    check(c.quadlets.0 & 0x02 != 0, "pad4 sets q0 bit1")
+    c = Fireface400.ConfigBlock()
+    c.instr3 = true; c.instr4 = true
+    check(c.quadlets.0 & 0x200 != 0, "instr3 sets q0 bit9")
+    check(c.quadlets.0 & 0x04 != 0, "instr4 sets q0 bit2")
+
+    // clock master bit + mandatory bits always present
+    check(c.quadlets.2 & 0x8000_001f == 0x8000_001f,
+          "q2 always has dropAndStop+rates+master")
+    c.clockMaster = false
+    check(c.quadlets.2 & 0x01 == 0, "autosync clears bit0")
+
+    // payload is 12 LE bytes
+    let p = c.payload
+    eq(p.count, 12, "config payload length")
+}
+
+// Re-print summary including the new block (the earlier exit() was moved below).
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

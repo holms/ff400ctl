@@ -15,6 +15,9 @@ public struct MixerState: Codable, Equatable {
     public var output: [UInt32]
     /// Raw amp-gain register values last written (index → devval).
     public var ampGains: [String: UInt32]
+    /// Device config block (phantom, pads, levels, clock) — write-only
+    /// register, so we track it and rewrite the whole block on change.
+    public var config: Fireface400.ConfigBlock
 
     public init() {
         input = [UInt32](repeating: 0, count: 324)
@@ -25,10 +28,21 @@ public struct MixerState: Codable, Equatable {
         }
         output = [UInt32](repeating: Fireface400.unityGain, count: Fireface400.channelCount)
         ampGains = [:]
+        config = Fireface400.ConfigBlock()
     }
 
     public static func index(src: Int, dest: Int) -> Int {
         src * Fireface400.channelCount + dest
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        input = try c.decode([UInt32].self, forKey: .input)
+        playback = try c.decode([UInt32].self, forKey: .playback)
+        output = try c.decode([UInt32].self, forKey: .output)
+        ampGains = try c.decode([String: UInt32].self, forKey: .ampGains)
+        config = try c.decodeIfPresent(Fireface400.ConfigBlock.self, forKey: .config)
+            ?? Fireface400.ConfigBlock()
     }
 
     // MARK: - Persistence

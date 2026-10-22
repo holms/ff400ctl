@@ -137,3 +137,104 @@ public enum Fireface400 {
         return Data(bytes: &v, count: 4)
     }
 }
+
+// MARK: - Device configuration register block
+
+extension Fireface400 {
+
+    /// FF400 configuration register — 3 quadlets, write-only, must be
+    /// written as one block (FFADO writes all three together).
+    public static let configReg: UInt32 = 0x8010_0514
+
+    public enum TriLevel: Int, Codable, CaseIterable {
+        case lowGain, plus4dBu, minus10dBV
+        public var label: String { ["LoGain", "+4 dBu", "-10 dBV"][rawValue] }
+    }
+
+    public enum SyncRef: Int, Codable, CaseIterable {
+        case adat1, adat2, spdif, wordClock, timecode
+        public var label: String { ["ADAT1", "ADAT2", "SPDIF", "WordClk", "TCO"][rawValue] }
+    }
+
+    /// The 3-quadlet config block (encoding per FFADO set_hardware_params /
+    /// ASFW EncodeConfig, FF400 variant). Written whole — every bit of the
+    /// block is meaningful, so toggling phantom requires rewriting all of it.
+    public struct ConfigBlock: Codable, Equatable {
+        public var phantom1 = false      // +48V on input 1   (q0 bit 0)
+        public var phantom2 = false      // +48V on input 2   (q0 bit 7)
+        public var pad3 = false          // -20 dB pad, in 3  (q0 bit 8)
+        public var pad4 = false          // -20 dB pad, in 4  (q0 bit 1)
+        public var instr3 = false        // instrument, in 3  (q0 bit 9)
+        public var instr4 = false        // instrument, in 4  (q0 bit 2)
+        public var inputLevel = TriLevel.plus4dBu    // rear inputs 5-8 ref level
+        public var outputLevel = TriLevel.plus4dBu
+        public var phonesLevel = TriLevel.plus4dBu
+        public var clockMaster = true
+        public var syncRef = SyncRef.adat1     // matches stored cfg (status1 mirror)
+        public var spdifPro = true       // status shows this set on stored cfg
+        public var spdifEmphasis = false
+        public var spdifNonAudio = false
+        public var spdifOutOptical = false
+        public var spdifInOptical = false
+        public var wordClockSingle = false
+
+        public init() {}
+
+        /// (q0, q1, q2) little-endian device quadlets.
+        public var quadlets: (UInt32, UInt32, UInt32) {
+            var q0: UInt32 = 0, q1: UInt32 = 0, q2: UInt32 = 0
+
+            if phantom1 { q0 |= 0x01 }
+            if phantom2 { q0 |= 0x80 }
+            if pad4      { q0 |= 0x02 }   // CR0_FF400_CH4_PAD
+            if instr4    { q0 |= 0x04 }   // CR0_FF400_CH4_INSTR
+            if pad3      { q0 |= 0x100 }  // CR0_FF400_CH3_PAD
+            if instr3    { q0 |= 0x200 }  // CR0_FF400_CH3_INSTR
+
+            switch inputLevel {
+            case .lowGain:    q0 |= 0x08; q1 |= 0x00
+            case .plus4dBu:   q0 |= 0x10; q1 |= 0x02
+            case .minus10dBV: q0 |= 0x20; q1 |= 0x03
+            }
+            switch outputLevel {
+            case .lowGain:    q0 |= 0x0400; q1 |= 0x10  // "high gain" in ffado
+            case .plus4dBu:   q0 |= 0x0800; q1 |= 0x18
+            case .minus10dBV: q0 |= 0x1000; q1 |= 0x08
+            }
+            switch phonesLevel {
+            case .lowGain:    q0 |= 0x20000 // higain
+            case .plus4dBu:   break         // 0
+            case .minus10dBV: q0 |= 0x10000
+            }
+
+            if clockMaster { q2 |= 0x01 }
+            if spdifPro { q2 |= 0x20 }
+            if spdifEmphasis { q2 |= 0x40 }
+            if spdifNonAudio { q2 |= 0x80 }
+            if spdifOutOptical { q2 |= 0x100 }
+            if spdifInOptical { q2 |= 0x200 }
+            if wordClockSingle { q2 |= 0x2000 }
+            switch syncRef {
+            case .adat1:     break           // 0x0000
+            case .adat2:     q2 |= 0x0400
+            case .spdif:     q2 |= 0x0c00
+            case .wordClock: q2 |= 0x1000
+            case .timecode:  q2 |= 0x1400
+            }
+            q2 |= 0x1e                       // FREQ0|FREQ1|DSPEED|QSSPEED
+            q2 |= 0x8000_0000                // DROP_AND_STOP
+            q2 |= 0x0400_0000                // CR2_FF400_BIT (MIDI TX offset 0)
+            return (q0, q1, q2)
+        }
+
+        /// 12-byte block payload.
+        public var payload: Data {
+            var d = Data()
+            for q in [quadlets.0, quadlets.1, quadlets.2] {
+                var le = q.littleEndian
+                d.append(Data(bytes: &le, count: 4))
+            }
+            return d
+        }
+    }
+}

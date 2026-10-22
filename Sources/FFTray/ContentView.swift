@@ -241,26 +241,41 @@ struct ContentView: View {
                 .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
             HStack(alignment: .top, spacing: 10) {
                 ForEach(0..<2, id: \.self) { i in
-                    VFader(
-                        title: "Mic \(i + 1)",
-                        value: Binding(
-                            get: { model.micGain[i] },
-                            set: { model.setMicGain(i, dB: $0) }
-                        ),
-                        range: 0...65, step: 1,
-                        display: String(format: "%.0f dB", model.micGain[i]),
-                        onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } })
+                    VStack(spacing: 3) {
+                        VFader(
+                            title: "Mic \(i + 1)",
+                            value: Binding(
+                                get: { model.micGain[i] },
+                                set: { model.setMicGain(i, dB: $0) }
+                            ),
+                            range: 0...65, step: 1,
+                            display: String(format: "%.0f dB", model.micGain[i]),
+                            onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } })
+                        FlagButton("48V", on: model.phantom[i], color: .yellow) {
+                            model.setPhantom(i, on: !model.phantom[i])
+                        }
+                    }
                 }
                 ForEach(0..<2, id: \.self) { i in
-                    VFader(
-                        title: "In \(i + 3)",
-                        value: Binding(
-                            get: { model.inGain[i] },
-                            set: { model.setInGain(i, dB: $0) }
-                        ),
-                        range: 0...30, step: 0.5,
-                        display: String(format: "%.1f dB", model.inGain[i]),
-                        onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } })
+                    VStack(spacing: 3) {
+                        VFader(
+                            title: "In \(i + 3)",
+                            value: Binding(
+                                get: { model.inGain[i] },
+                                set: { model.setInGain(i, dB: $0) }
+                            ),
+                            range: 0...30, step: 0.5,
+                            display: String(format: "%.1f dB", model.inGain[i]),
+                            onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } })
+                        HStack(spacing: 2) {
+                            FlagButton("PAD", on: model.pad[i], color: .orange) {
+                                model.setPad(i, on: !model.pad[i])
+                            }
+                            FlagButton("INST", on: model.instr[i], color: Theme.pbOn) {
+                                model.setInstr(i, on: !model.instr[i])
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -277,6 +292,28 @@ struct ContentView: View {
         }
         .buttonStyle(.borderless)
         .font(.caption)
+    }
+}
+
+/// Small toggle chip used for phantom/pad/instrument flags.
+private struct FlagButton: View {
+    let title: String
+    let on: Bool
+    let color: Color
+    let action: () -> Void
+    init(_ t: String, on: Bool, color: Color, action: @escaping () -> Void) {
+        title = t; self.on = on; self.color = color; self.action = action
+    }
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .padding(.horizontal, 3).padding(.vertical, 2)
+                .background(RoundedRectangle(cornerRadius: 3)
+                    .fill(on ? color.opacity(0.9) : Theme.offCell))
+                .foregroundStyle(on ? .black : Theme.secondary)
+        }
+        .buttonStyle(.plain)
     }
 }
 
