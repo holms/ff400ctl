@@ -182,6 +182,37 @@ final class MixerModel: NSObject, ObservableObject {
 
     // MARK: - Outputs
 
+    // MARK: - Drag previews (hardware write only — no @Published churn)
+
+    /// Live output-fader preview during a drag. Uses the same coalescing
+    /// keys as `setOutput` so the commit on release lands cleanly.
+    func previewOutput(_ ch: Int, gain: UInt32) {
+        let peer = ch ^ 1, linked = outputStereo[ch / 2]
+        hw("out.\(ch)") { c in c.setOutputFader(ch: ch, gain: gain) }
+        if linked {
+            hw("out.\(peer)") { c in c.setOutputFader(ch: peer, gain: gain) }
+        }
+    }
+
+    func previewInputSend(_ src: Int, gain: UInt32) {
+        let pair = busPairs[monitorBus]
+        hw("send.\(src)", "send write failed") { c in
+            var ok = c.setInputFader(src: src, dest: pair.a, gain: gain)
+            ok = c.setInputFader(src: src, dest: pair.b, gain: gain) && ok
+            return ok
+        }
+    }
+
+    func previewMicGain(_ i: Int, dB: Double) {
+        let idx = i == 0 ? Fireface400.AmpGain.mic1.rawValue : Fireface400.AmpGain.mic2.rawValue
+        hw("mic.\(i)") { c in c.setAmpGain(index: idx, dB: dB) }
+    }
+
+    func previewInGain(_ i: Int, dB: Double) {
+        let idx = i == 0 ? Fireface400.AmpGain.input3.rawValue : Fireface400.AmpGain.input4.rawValue
+        hw("ingain.\(i)") { c in c.setAmpGain(index: idx, dB: dB) }
+    }
+
     func setOutput(_ ch: Int, gain: UInt32) {
         output[ch] = gain
         let peer = ch ^ 1, linked = outputStereo[ch / 2]

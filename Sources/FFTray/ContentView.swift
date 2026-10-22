@@ -64,21 +64,37 @@ struct EditableValue: View {
 }
 
 /// One vertical fader column: travel slider + name + editable value.
+/// During a drag the slider position lives in `live` (view-local), so a
+/// fast drag doesn't republish the model and re-render the whole panel
+/// per tick; `onLive` still fires a coalesced hardware preview write.
+/// The model is committed once, on release, through `value`'s setter.
 struct VFader: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double? = nil
-    let display: String
+    let format: (Double) -> String
+    let onLive: (Double) -> Void
     let onText: (String) -> Void
+    @State private var live: Double?
+
+    private var dragBinding: Binding<Double> {
+        Binding(get: { live ?? value }, set: { live = $0; onLive($0) })
+    }
+
+    private func commit(_ editing: Bool) {
+        if !editing, let v = live { value = v; live = nil }
+    }
 
     var body: some View {
         VStack(spacing: 3) {
             ZStack {
                 if let step {
-                    Slider(value: $value, in: range, step: step)
+                    Slider(value: dragBinding, in: range, step: step,
+                           onEditingChanged: commit)
                 } else {
-                    Slider(value: $value, in: range)
+                    Slider(value: dragBinding, in: range,
+                           onEditingChanged: commit)
                 }
             }
             .frame(width: faderTravel)
@@ -90,7 +106,7 @@ struct VFader: View {
                 .foregroundStyle(Theme.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            EditableValue(text: display, width: faderColW - 2, onCommit: onText)
+            EditableValue(text: format(live ?? value), width: faderColW - 2, onCommit: onText)
         }
         .frame(width: faderColW)
     }
@@ -132,6 +148,7 @@ struct ContentView: View {
                     if model.matrixTab == 0 { model.toggleInput(src: s, dest: d) }
                     else { model.togglePlayback(src: s, dest: d) }
                 })
+            .equatable()
 
             inputSendStrip
             outputStrip
@@ -193,7 +210,8 @@ struct ContentView: View {
                                 set: { model.setInputSend(src, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
                             ),
                             range: 0...2,
-                            display: fmtDB(model.inputSendDB(src)),
+                            format: { fmtDB(Fireface400.db(fromGain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded())))) },
+                            onLive: { model.previewInputSend(src, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) },
                             onText: { t in
                                 if let db = parseDB(t) {
                                     model.setInputSend(src, gain: Fireface400.gain(fromDB: db))
@@ -231,7 +249,8 @@ struct ContentView: View {
                     set: { model.setOutput(ch, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
                 ),
                 range: 0...2,
-                display: fmtDB(model.outputDB(ch)),
+                format: { fmtDB(Fireface400.db(fromGain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded())))) },
+                onLive: { model.previewOutput(ch, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) },
                 onText: { t in
                     if let db = parseDB(t) {
                         model.setOutput(ch, gain: Fireface400.gain(fromDB: db))
@@ -263,7 +282,8 @@ struct ContentView: View {
                                             set: { model.setOutput(l, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
                                         ),
                                         range: 0...2,
-                                        display: fmtDB(model.outputDB(l)),
+                                        format: { fmtDB(Fireface400.db(fromGain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded())))) },
+                                        onLive: { model.previewOutput(l, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) },
                                         onText: { t in
                                             if let db = parseDB(t) {
                                                 model.setOutput(l, gain: Fireface400.gain(fromDB: db))
@@ -312,7 +332,8 @@ struct ContentView: View {
                                 set: { model.setMicGain(i, dB: $0) }
                             ),
                             range: 0...65, step: 1,
-                            display: String(format: "%.0f dB", model.micGain[i]),
+                            format: { String(format: "%.0f dB", $0) },
+                            onLive: { model.previewMicGain(i, dB: $0) },
                             onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } })
                         FlagButton("48V", on: model.phantom[i], color: .yellow) {
                             model.setPhantom(i, on: !model.phantom[i])
@@ -328,7 +349,8 @@ struct ContentView: View {
                                 set: { model.setInGain(i, dB: $0) }
                             ),
                             range: 0...30, step: 0.5,
-                            display: String(format: "%.1f dB", model.inGain[i]),
+                            format: { String(format: "%.1f dB", $0) },
+                            onLive: { model.previewInGain(i, dB: $0) },
                             onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } })
                         HStack(spacing: 2) {
                             FlagButton("PAD", on: model.pad[i], color: .orange) {
@@ -387,7 +409,10 @@ private struct FlagButton: View {
     }
 }
 
-private struct MatrixView: View {
+private struct MatrixView: View, Equatable {
+    static func == (l: MatrixView, r: MatrixView) -> Bool {
+        l.cells == r.cells && l.rowNames == r.rowNames && l.onColor == r.onColor
+    }
     let cells: [UInt32]
     let rowNames: [String]
     let onColor: Color

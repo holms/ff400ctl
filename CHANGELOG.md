@@ -34,6 +34,11 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 - Re-clicking "Detach" re-centered the detached window over the user's
   position; center only on first open. The detached window is now
   Cmd-Tab reachable (`.regular` activation policy while open)
+- Fader drags republished a `@Published` array per slider tick, so the
+  whole panel (incl. the 324-cell matrix) re-rendered every tick — the
+  visible "lag". Drag state is now view-local; hardware writes still
+  stream via coalesced preview calls, and the model commits once on
+  release. `MatrixView` is `Equatable` and skips unchanged re-renders
 
 ### Added
 - **Detach** button: opens the mixer in a normal titled window that stays
