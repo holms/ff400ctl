@@ -406,8 +406,10 @@ final class MixerModel: NSObject, ObservableObject {
                 rootView: ContentView(detached: true).environmentObject(self))
             let w = NSWindow(contentViewController: host)
             w.title = "Fireface 400 Mixer"
-            w.styleMask = [.titled, .closable, .miniaturizable]
+            w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             w.isReleasedWhenClosed = false
+            w.contentMinSize = NSSize(width: 660,
+                                      height: host.view.fittingSize.height)
             w.delegate = self
             w.center()
             detachedWindow = w

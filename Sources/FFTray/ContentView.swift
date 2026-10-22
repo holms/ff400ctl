@@ -156,7 +156,8 @@ struct ContentView: View {
             footer
         }
         .padding(12)
-        .frame(width: 660)
+        .frame(minWidth: 660, maxWidth: detached ? .infinity : 660,
+               alignment: .topLeading)
         .background(Theme.bg)
         .colorScheme(.dark)
     }
@@ -200,7 +201,7 @@ struct ContentView: View {
                     model.setMono(!model.monoBus)
                 }
             }
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: true) {
                 HStack(alignment: .top, spacing: 2) {
                     ForEach(0..<Fireface400.channelCount, id: \.self) { src in
                         VFader(
@@ -232,6 +233,8 @@ struct ContentView: View {
                     }
                 }
                 .padding(.vertical, 2)
+                .padding(.trailing, 8)
+                .padding(.bottom, 6)
             }
             Text("row 1-4 = front jacks · 5-8 = rear line · 9-10 = SPDIF · 11-18 = ADAT")
                 .font(.system(size: 8, design: .monospaced))
@@ -268,7 +271,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("OUTPUTS")
                 .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: true) {
                 HStack(alignment: .top, spacing: 6) {
                     ForEach(0..<Fireface400.channelCount / 2, id: \.self) { p in
                         let l = p * 2, r = p * 2 + 1
@@ -310,6 +313,8 @@ struct ContentView: View {
                     }
                 }
                 .padding(.vertical, 2)
+                .padding(.trailing, 8)
+                .padding(.bottom, 6)
             }
             Text("1-6 = analog · 7-8 = phones · 9-10 = SPDIF · 11-18 = ADAT · ST links a pair into one fader")
                 .font(.system(size: 8, design: .monospaced))

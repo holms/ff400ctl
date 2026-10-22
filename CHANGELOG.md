@@ -2,6 +2,14 @@
 
 All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Input/output strips showed no scroll affordance and the last fader was
+  visibly clipped at the panel edge — scrollbars are now shown, the last
+  column gets trailing padding, and the detached window is resizable so
+  all 18 channels fit
+
 ## [0.5.0] - 2026-10-23
 
 ### Fixed
