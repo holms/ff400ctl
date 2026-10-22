@@ -197,7 +197,7 @@ struct ContentView: View {
                                     model.setInputSend(src, gain: Fireface400.gain(fromDB: db))
                                 }
                             })
-                        VStack(spacing: 2) {
+                        VStack(spacing: 3) {
                             FlagButton("M", on: model.inputMute[src], color: .orange) {
                                 model.setInputMute(src, on: !model.inputMute[src])
                             }
@@ -208,6 +208,7 @@ struct ContentView: View {
                                 model.setInputPhase(src, on: !model.inputPhase[src])
                             }
                         }
+                        .padding(.top, 30)
                     }
                 }
                 .padding(.vertical, 2)
@@ -367,11 +368,13 @@ private struct FlagButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 7, weight: .bold, design: .monospaced))
-                .padding(.horizontal, 3).padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 3)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .frame(minWidth: 26)
+                .padding(.horizontal, 4).padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: 4)
                     .fill(on ? color.opacity(0.9) : Theme.offCell))
                 .foregroundStyle(on ? .black : Theme.secondary)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
