@@ -93,6 +93,10 @@ final class MixerModel: NSObject, ObservableObject {
     /// auto-saved (coalesced) after each change.
     private func hw(_ key: String, _ failMsg: String = "write failed",
                     _ work: @escaping (FirefaceController) -> Bool) {
+        guard ctl != nil else {
+            lastError = "not connected — change not applied"
+            return
+        }
         hwq.submit(key) { [weak self] in
             guard let self, let c = self.ctl else { return }
             if !work(c) {
