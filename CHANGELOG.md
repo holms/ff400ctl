@@ -5,6 +5,20 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- Output stereo-link (TotalMix stereo button): `ST` chips on the tray
+  output strip merge a pair into one fader; writes mirror to both
+  channels and adopt the L value on link. `ffctl stereo <pair> on|off`,
+  persisted in `MixerState.outputStereo`
+- Write coalescing in FFTray: fader drags update the UI instantly and
+  hardware writes drain on a serial background queue with latest-value-
+  wins per key — eliminates drag lag and stale-write backlogs
+- 7 new unit checks (124 total): stereo-link bounds + Codable persistence
+
+### Changed
+- FFTray model methods are now optimistic: UI state updates immediately,
+  hardware failures surface in the header instead of blocking the fader
+
+### Added
 - Automation commands (CLI):
   - `ffctl save|load|snaps|rmsnap` — named mix snapshots
     (TotalMix "workspace" style) stored in

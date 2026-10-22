@@ -273,5 +273,27 @@ do {
     check(MixerState.snapshotURL(name: "../etc/passwd").lastPathComponent == "etcpasswd.json",
           "snapshot name sanitized")
 }
+
+// MARK: - Stereo output pairs
+
+do {
+    var s = MixerState()
+    check(s.outputStereo.count == 9, "9 stereo pair flags by default")
+    check(s.outputStereo.allSatisfy { !$0 }, "pairs unlinked by default")
+
+    let ctl = FirefaceController(testing: s, sink: { _, _ in true })
+    check(ctl.setOutputStereo(pair: 0, on: true), "link pair 0")
+    check(ctl.state.outputStereo[0] == true, "pair 0 linked in state")
+    check(!ctl.setOutputStereo(pair: 9, on: true), "pair 9 out of range")
+    check(!ctl.setOutputStereo(pair: -1, on: true), "negative pair rejected")
+
+    // persists through Codable
+    let data = try! JSONEncoder().encode(ctl.state)
+    let back = try! JSONDecoder().decode(MixerState.self, from: data)
+    check(back.outputStereo[0] == true, "stereo link survives round-trip")
+    s = back
+    s.outputStereo = []
+    // stale file with short array is tolerated on decode path? (not: decodeIfPresent keeps it)
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

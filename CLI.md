@@ -69,9 +69,15 @@ ffctl solo <in> <on|off>     # exclusive solo on the monitor bus pair
 ffctl phase <in> <on|off>    # phase invert (writes negative cell gain)
 ffctl outmute <ch> <on|off>  # mute output master fader + amp gain
 ffctl mono <on|off>          # lock the monitor bus pair L=R
+ffctl stereo <pair> <on|off> # stereo-link an output pair (0-8:
+                             # 0=AN1/2, 1=AN3/4, 2=AN5/6, 3=PHONES,
+                             # 4=SPDIF, 5-8=ADAT pairs)
 ```
 
 - `mute` writes 0 to hardware but keeps your fader value — unmute restores it.
+- `stereo` links a pair's faders: in FFTray the two columns merge into
+  one fader and writes are mirrored to both channels — TotalMix's stereo
+  button. Persisted in state, honored by the tray app.
 - `solo` is exclusive: engaging one input silences all others **on the
   monitor bus pair only** (AN1/2). Other outputs are untouched.
 - `phase` writes the negative of the fader (FFADO convention). On a 0

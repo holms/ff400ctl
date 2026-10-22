@@ -251,6 +251,15 @@ extension FirefaceController {
         return ok
     }
 
+    /// Stereo-link an output fader pair (0..<9 → channels 2i/2i+1).
+    /// Software-only flag — the UI/CLI mirror fader writes across the pair.
+    @discardableResult
+    public func setOutputStereo(pair: Int, on: Bool) -> Bool {
+        guard (0..<Fireface400.channelCount / 2).contains(pair) else { return false }
+        state.outputStereo[pair] = on
+        return true
+    }
+
     /// Mute/unmute an output master fader (mixer fader + hw amp gain).
     @discardableResult
     public func setOutputMute(ch: Int, on: Bool) -> Bool {

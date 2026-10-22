@@ -26,6 +26,9 @@ public struct MixerState: Codable, Equatable {
     public var outputMute: [Bool]
     /// When true, the monitor bus pair is mono-locked (L and R cells equal).
     public var monoBus: Bool
+    /// Stereo-link flags for the 9 output pairs (TotalMix "stereo" button):
+    /// pair i = channels 2i/2i+1; a linked pair moves as one fader.
+    public var outputStereo: [Bool]
 
     public init() {
         input = [UInt32](repeating: 0, count: 324)
@@ -42,6 +45,7 @@ public struct MixerState: Codable, Equatable {
         inputSolo = [Bool](repeating: false, count: Fireface400.channelCount)
         outputMute = [Bool](repeating: false, count: Fireface400.channelCount)
         monoBus = false
+        outputStereo = [Bool](repeating: false, count: Fireface400.channelCount / 2)
     }
 
     public static func index(src: Int, dest: Int) -> Int {
@@ -65,6 +69,8 @@ public struct MixerState: Codable, Equatable {
         outputMute = try c.decodeIfPresent([Bool].self, forKey: .outputMute)
             ?? [Bool](repeating: false, count: Fireface400.channelCount)
         monoBus = try c.decodeIfPresent(Bool.self, forKey: .monoBus) ?? false
+        outputStereo = try c.decodeIfPresent([Bool].self, forKey: .outputStereo)
+            ?? [Bool](repeating: false, count: Fireface400.channelCount / 2)
     }
 
     // MARK: - Persistence

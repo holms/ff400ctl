@@ -218,35 +218,77 @@ struct ContentView: View {
         }
     }
 
-    /// Output master faders.
+    /// One output master fader column (fader + M chip).
+    private func outFader(_ ch: Int, title: String) -> some View {
+        VStack(spacing: 2) {
+            VFader(
+                title: title,
+                value: Binding(
+                    get: { Double(model.output[ch]) / Double(Fireface400.unityGain) },
+                    set: { model.setOutput(ch, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
+                ),
+                range: 0...2,
+                display: fmtDB(model.outputDB(ch)),
+                onText: { t in
+                    if let db = parseDB(t) {
+                        model.setOutput(ch, gain: Fireface400.gain(fromDB: db))
+                    }
+                })
+            FlagButton("M", on: model.outputMute[ch], color: .orange) {
+                model.setOutputMute(ch, on: !model.outputMute[ch])
+            }
+        }
+    }
+
+    /// Output master faders, in stereo pairs. The ST chip links a pair
+    /// into a single fader, like TotalMix's stereo button.
     private var outputStrip: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("OUTPUTS")
                 .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 2) {
-                    ForEach(0..<Fireface400.channelCount, id: \.self) { ch in
-                        VFader(
-                            title: "\(ch + 1)",
-                            value: Binding(
-                                get: { Double(model.output[ch]) / Double(Fireface400.unityGain) },
-                                set: { model.setOutput(ch, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
-                            ),
-                            range: 0...2,
-                            display: fmtDB(model.outputDB(ch)),
-                            onText: { t in
-                                if let db = parseDB(t) {
-                                    model.setOutput(ch, gain: Fireface400.gain(fromDB: db))
+                HStack(alignment: .top, spacing: 6) {
+                    ForEach(0..<Fireface400.channelCount / 2, id: \.self) { p in
+                        let l = p * 2, r = p * 2 + 1
+                        HStack(alignment: .top, spacing: 2) {
+                            if model.outputStereo[p] {
+                                VStack(spacing: 2) {
+                                    VFader(
+                                        title: "\(l + 1)·\(r + 1)",
+                                        value: Binding(
+                                            get: { Double(model.output[l]) / Double(Fireface400.unityGain) },
+                                            set: { model.setOutput(l, gain: UInt32(clamping: Int(($0 * Double(Fireface400.unityGain)).rounded()))) }
+                                        ),
+                                        range: 0...2,
+                                        display: fmtDB(model.outputDB(l)),
+                                        onText: { t in
+                                            if let db = parseDB(t) {
+                                                model.setOutput(l, gain: Fireface400.gain(fromDB: db))
+                                            }
+                                        })
+                                    HStack(spacing: 2) {
+                                        FlagButton("M", on: model.outputMute[l], color: .orange) {
+                                            model.setOutputMute(l, on: !model.outputMute[l])
+                                        }
+                                        FlagButton("M", on: model.outputMute[r], color: .orange) {
+                                            model.setOutputMute(r, on: !model.outputMute[r])
+                                        }
+                                    }
                                 }
-                            })
-                        FlagButton("M", on: model.outputMute[ch], color: .orange) {
-                            model.setOutputMute(ch, on: !model.outputMute[ch])
+                            } else {
+                                outFader(l, title: "\(l + 1)")
+                                outFader(r, title: "\(r + 1)")
+                            }
+                            FlagButton("ST", on: model.outputStereo[p], color: Theme.pbOn) {
+                                model.setStereoPair(p, on: !model.outputStereo[p])
+                            }
+                            .padding(.top, 40)
                         }
                     }
                 }
                 .padding(.vertical, 2)
             }
-            Text("1-6 = analog · 7-8 = phones · 9-10 = SPDIF · 11-18 = ADAT")
+            Text("1-6 = analog · 7-8 = phones · 9-10 = SPDIF · 11-18 = ADAT · ST links a pair into one fader")
                 .font(.system(size: 8, design: .monospaced))
                 .foregroundStyle(Theme.secondary.opacity(0.7))
         }

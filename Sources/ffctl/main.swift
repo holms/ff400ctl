@@ -19,6 +19,7 @@ func usage() -> Never {
       ffctl phase <in> <on|off>  phase invert input row (negative gain)
       ffctl outmute <ch> <on|off> mute output master fader
       ffctl mono <on|off>        mono-lock the AN1/2 bus pair
+      ffctl stereo <pair> <on|off> stereo-link output pair (0=AN1/2, 3=PHONES…)
       ffctl cfg <key> <val>        config fields: ilevel/olevel/phlevel
                                    (logain|4dbu|10dbv), spdifpro on|off
       ffctl config                 show tracked config + quadlets
@@ -118,6 +119,9 @@ func run(_ a: ArraySlice<String>, _ ctl: FirefaceController) -> Int32 {
     case "mono":
         guard a.count > 1, let on = onOff(a[1]) else { usage() }
         guard ok(ctl.setMonoBus(on: on), "mono \(on)") else { return 1 }
+    case "stereo":
+        guard a.count > 2, let p = Int(a[1]), let on = onOff(a[2]) else { usage() }
+        guard ok(ctl.setOutputStereo(pair: p, on: on), "stereo pair \(p)") else { return 1 }
     case "cfg":
         guard a.count > 2 else { usage() }
         var c = ctl.config

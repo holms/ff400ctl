@@ -25,6 +25,37 @@ let busPairs: [(name: String, a: Int, b: Int)] = [
     ("ADAT 5/6", 14, 15), ("ADAT 7/8", 16, 17),
 ]
 
+/// Serializes hardware writes on one background queue and drops
+/// superseded work: while a write is in flight, a new submission for the
+/// same key replaces the pending one. A fast fader drag therefore
+/// coalesces into ~1 write per transaction time instead of queueing a
+/// backlog that blocks the main thread.
+final class WriteCoalescer {
+    private let q = DispatchQueue(label: "ff400.hw", qos: .userInitiated)
+    private var pending: [(key: String, work: () -> Void)] = []
+    private var inFlight = false
+
+    func submit(_ key: String, _ work: @escaping () -> Void) {
+        q.async {
+            if let i = self.pending.firstIndex(where: { $0.key == key }) {
+                self.pending[i].work = work
+            } else {
+                self.pending.append((key, work))
+            }
+            self.drain()
+        }
+    }
+
+    private func drain() {
+        guard !inFlight, let next = pending.first else { return }
+        pending.removeFirst()
+        inFlight = true
+        next.work()
+        inFlight = false
+        drain()
+    }
+}
+
 final class MixerModel: ObservableObject {
     @Published var connected = false
     @Published var lastError: String?
@@ -33,6 +64,7 @@ final class MixerModel: ObservableObject {
     @Published var input: [UInt32]
     @Published var playback: [UInt32]
     @Published var output: [UInt32]
+    @Published var outputStereo = [Bool](repeating: false, count: 9)
     @Published var micGain: [Double] = [0, 0]
     @Published var inGain: [Double] = [0, 0]
     @Published var phantom: [Bool] = [false, false]
@@ -45,6 +77,7 @@ final class MixerModel: ObservableObject {
     @Published var monoBus = false
 
     private var ctl: FirefaceController?
+    private let hwq = WriteCoalescer()
 
     init() {
         let s = MixerState.load()
@@ -64,8 +97,22 @@ final class MixerModel: ObservableObject {
             inputSolo = c.state.inputSolo
             outputMute = c.state.outputMute
             monoBus = c.state.monoBus
+            outputStereo = c.state.outputStereo
         } catch {
             lastError = "\(error)"
+        }
+    }
+
+    /// Run a hardware operation on the serial write queue; report failure
+    /// back on the main thread. UI state is updated optimistically by the
+    /// caller so faders stay responsive while transactions drain.
+    private func hw(_ key: String, _ failMsg: String = "write failed",
+                    _ work: @escaping (FirefaceController) -> Bool) {
+        hwq.submit(key) { [weak self] in
+            guard let self, let c = self.ctl else { return }
+            if !work(c) {
+                DispatchQueue.main.async { self.lastError = failMsg }
+            }
         }
     }
 
@@ -84,42 +131,45 @@ final class MixerModel: ObservableObject {
 
     func setInputSend(_ src: Int, gain: UInt32) {
         let pair = busPairs[monitorBus]
-        var ok = false
-        if ctl?.setInputFader(src: src, dest: pair.a, gain: gain) ?? false {
-            input[idx(src, pair.a)] = gain; ok = true
+        input[idx(src, pair.a)] = gain
+        input[idx(src, pair.b)] = gain
+        hw("send.\(src)", "send write failed") { c in
+            var ok = c.setInputFader(src: src, dest: pair.a, gain: gain)
+            ok = c.setInputFader(src: src, dest: pair.b, gain: gain) && ok
+            return ok
         }
-        if ctl?.setInputFader(src: src, dest: pair.b, gain: gain) ?? false {
-            input[idx(src, pair.b)] = gain; ok = true
-        }
-        if !ok { lastError = "send write failed" }
     }
 
     func setInputMute(_ src: Int, on: Bool) {
-        if ctl?.setInputMute(src: src, on: on) ?? false { inputMute[src] = on }
-        else { lastError = "write failed" }
+        inputMute[src] = on
+        hw("imute.\(src)") { c in c.setInputMute(src: src, on: on) }
     }
 
     func setInputPhase(_ src: Int, on: Bool) {
-        if ctl?.setInputPhase(src: src, on: on) ?? false { inputPhase[src] = on }
-        else { lastError = "write failed" }
+        inputPhase[src] = on
+        hw("iphase.\(src)") { c in c.setInputPhase(src: src, on: on) }
     }
 
     func setInputSolo(_ src: Int, on: Bool) {
-        if ctl?.setInputSolo(src: src, on: on) ?? false {
-            for i in 0..<18 { inputSolo[i] = (i == src) && on }
-        } else { lastError = "write failed" }
+        for i in 0..<18 { inputSolo[i] = (i == src) && on }
+        hw("solo") { c in c.setInputSolo(src: src, on: on) }
     }
 
     func setOutputMute(_ ch: Int, on: Bool) {
-        if ctl?.setOutputMute(ch: ch, on: on) ?? false { outputMute[ch] = on }
-        else { lastError = "write failed" }
+        outputMute[ch] = on
+        hw("omute.\(ch)") { c in c.setOutputMute(ch: ch, on: on) }
     }
 
     func setMono(_ on: Bool) {
-        if ctl?.setMonoBus(on: on) ?? false {
-            monoBus = on
-            if on, let s = ctl?.state { input = s.input }
-        } else { lastError = "write failed" }
+        monoBus = on
+        hw("mono") { c in
+            let ok = c.setMonoBus(on: on)
+            if ok, on {
+                let cells = c.state.input
+                DispatchQueue.main.async { self.input = cells }
+            }
+            return ok
+        }
     }
 
     func inputSendDB(_ src: Int) -> Double {
@@ -130,24 +180,39 @@ final class MixerModel: ObservableObject {
 
     func toggleInput(src: Int, dest: Int) {
         let newVal: UInt32 = input[idx(src, dest)] == 0 ? Fireface400.unityGain : 0
-        if ctl?.setInputFader(src: src, dest: dest, gain: newVal) ?? false {
-            input[idx(src, dest)] = newVal
-        } else { lastError = "write failed" }
+        input[idx(src, dest)] = newVal
+        hw("cell.i.\(src).\(dest)") { c in c.setInputFader(src: src, dest: dest, gain: newVal) }
     }
 
     func togglePlayback(src: Int, dest: Int) {
         let newVal: UInt32 = playback[idx(src, dest)] == 0 ? Fireface400.unityGain : 0
-        if ctl?.setPlaybackFader(src: src, dest: dest, gain: newVal) ?? false {
-            playback[idx(src, dest)] = newVal
-        } else { lastError = "write failed" }
+        playback[idx(src, dest)] = newVal
+        hw("cell.p.\(src).\(dest)") { c in c.setPlaybackFader(src: src, dest: dest, gain: newVal) }
     }
 
     // MARK: - Outputs
 
     func setOutput(_ ch: Int, gain: UInt32) {
-        if ctl?.setOutputFader(ch: ch, gain: gain) ?? false {
-            output[ch] = gain
-        } else { lastError = "write failed" }
+        output[ch] = gain
+        let peer = ch ^ 1, linked = outputStereo[ch / 2]
+        if linked { output[peer] = gain }
+        hw("out.\(ch / 2)") { c in
+            var ok = c.setOutputFader(ch: ch, gain: gain)
+            if linked { ok = c.setOutputFader(ch: peer, gain: gain) && ok }
+            return ok
+        }
+    }
+
+    /// TotalMix-style stereo button: a linked pair moves as one fader.
+    func setStereoPair(_ pair: Int, on: Bool) {
+        outputStereo[pair] = on
+        if on {
+            // adopt L's fader value for both, like TotalMix
+            let g = output[pair * 2]
+            output[pair * 2 + 1] = g
+            hw("out.\(pair)") { c in c.setOutputFader(ch: pair * 2 + 1, gain: g) }
+        }
+        hw("stereo.\(pair)") { c in c.setOutputStereo(pair: pair, on: on) }
     }
 
     func outputDB(_ ch: Int) -> Double { Fireface400.db(fromGain: output[ch]) }
@@ -155,39 +220,46 @@ final class MixerModel: ObservableObject {
     // MARK: - Hardware preamp gains (only inputs 1-4 have them)
 
     func setMicGain(_ i: Int, dB: Double) {
+        micGain[i] = dB
         let idx = i == 0 ? Fireface400.AmpGain.mic1.rawValue : Fireface400.AmpGain.mic2.rawValue
-        if ctl?.setAmpGain(index: idx, dB: dB) ?? false { micGain[i] = dB }
-        else { lastError = "write failed" }
+        hw("mic.\(i)") { c in c.setAmpGain(index: idx, dB: dB) }
     }
 
     func setInGain(_ i: Int, dB: Double) {
+        inGain[i] = dB
         let idx = i == 0 ? Fireface400.AmpGain.input3.rawValue : Fireface400.AmpGain.input4.rawValue
-        if ctl?.setAmpGain(index: idx, dB: dB) ?? false { inGain[i] = dB }
-        else { lastError = "write failed" }
+        hw("ingain.\(i)") { c in c.setAmpGain(index: idx, dB: dB) }
     }
 
     func setPhantom(_ i: Int, on: Bool) {
-        if ctl?.setPhantom(ch: i, on: on) ?? false { phantom[i] = on }
-        else { lastError = "config write failed" }
+        phantom[i] = on
+        hw("cfg", "config write failed") { c in c.setPhantom(ch: i, on: on) }
     }
 
     func setPad(_ i: Int, on: Bool) {
-        if ctl?.setPad(ch: i + 2, on: on) ?? false { pad[i] = on }
-        else { lastError = "config write failed" }
+        pad[i] = on
+        hw("cfg", "config write failed") { c in c.setPad(ch: i + 2, on: on) }
     }
 
     func setInstr(_ i: Int, on: Bool) {
-        if ctl?.setInstrument(ch: i + 2, on: on) ?? false { instr[i] = on }
-        else { lastError = "config write failed" }
+        instr[i] = on
+        hw("cfg", "config write failed") { c in c.setInstrument(ch: i + 2, on: on) }
     }
 
     // MARK: - Bulk
 
     func applyAll() {
-        let r = ctl?.applyAll()
-        if let r { lastError = r.failed == 0 ? nil : "\(r.failed) writes failed" }
-        if let s = ctl?.state { input = s.input; playback = s.playback; output = s.output }
+        hwq.submit("apply") { [weak self] in
+            guard let self, let r = self.ctl?.applyAll() else { return }
+            let s = self.ctl?.state
+            DispatchQueue.main.async {
+                self.lastError = r.failed == 0 ? nil : "\(r.failed) writes failed"
+                if let s { self.input = s.input; self.playback = s.playback; self.output = s.output }
+            }
+        }
     }
 
-    func save() { ctl?.saveState() }
+    func save() {
+        hwq.submit("save") { [weak self] in self?.ctl?.saveState() }
+    }
 }
