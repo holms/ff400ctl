@@ -295,5 +295,52 @@ do {
     s.outputStereo = []
     // stale file with short array is tolerated on decode path? (not: decodeIfPresent keeps it)
 }
+
+// MARK: - WriteCoalescer (same-key coalescing, FIFO, position-preserving replace)
+
+do {
+    // (a) 50 same-key submits while blocked -> blocker + one merged run
+    let wq = WriteCoalescer()
+    let started = DispatchSemaphore(value: 0)
+    let gate = DispatchSemaphore(value: 0)
+    var execs = 0
+    var recorded: [Int] = []
+    wq.submit("block") { started.signal(); gate.wait(); execs += 1 }
+    started.wait()
+    for i in 0..<50 { wq.submit("k") { recorded.append(i) } }
+    gate.signal()
+    wq.waitUntilIdle()
+    eq(execs, 1, "blocker ran once")
+    eq(recorded, [49], "50 same-key submits coalesced to the latest")
+
+    // (b) distinct keys all run, FIFO
+    let wq2 = WriteCoalescer()
+    let st2 = DispatchSemaphore(value: 0), g2 = DispatchSemaphore(value: 0)
+    var order: [String] = []
+    wq2.submit("block") { st2.signal(); g2.wait() }
+    st2.wait()
+    for k in ["a", "b", "c"] { wq2.submit(k) { order.append(k) } }
+    g2.signal()
+    wq2.waitUntilIdle()
+    eq(order, ["a", "b", "c"], "distinct keys run FIFO")
+
+    // (c) replacing a pending key keeps its queue position
+    let wq3 = WriteCoalescer()
+    let st3 = DispatchSemaphore(value: 0), g3 = DispatchSemaphore(value: 0)
+    var order3: [String] = []
+    wq3.submit("block") { st3.signal(); g3.wait() }
+    st3.wait()
+    wq3.submit("a") { order3.append("a1") }
+    wq3.submit("b") { order3.append("b") }
+    wq3.submit("a") { order3.append("a2") }
+    g3.signal()
+    wq3.waitUntilIdle()
+    eq(order3, ["a2", "b"], "same-key replace keeps position")
+
+    // waitUntilIdle returns immediately on an empty queue
+    let wq4 = WriteCoalescer()
+    wq4.waitUntilIdle()
+    check(true, "waitUntilIdle on empty queue returns")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

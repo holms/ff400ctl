@@ -4,6 +4,14 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Fixed
+- WriteCoalescer never coalesced: submissions were queued behind the
+  running work, so every submit executed. Moved to FFCore and
+  reimplemented with a lock + single drain loop; `waitUntilIdle()` added
+
+### Changed
+- `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)
+
 ## [0.4.0] - 2026-10-23
 
 ### Added

@@ -25,37 +25,6 @@ let busPairs: [(name: String, a: Int, b: Int)] = [
     ("ADAT 5/6", 14, 15), ("ADAT 7/8", 16, 17),
 ]
 
-/// Serializes hardware writes on one background queue and drops
-/// superseded work: while a write is in flight, a new submission for the
-/// same key replaces the pending one. A fast fader drag therefore
-/// coalesces into ~1 write per transaction time instead of queueing a
-/// backlog that blocks the main thread.
-final class WriteCoalescer {
-    private let q = DispatchQueue(label: "ff400.hw", qos: .userInitiated)
-    private var pending: [(key: String, work: () -> Void)] = []
-    private var inFlight = false
-
-    func submit(_ key: String, _ work: @escaping () -> Void) {
-        q.async {
-            if let i = self.pending.firstIndex(where: { $0.key == key }) {
-                self.pending[i].work = work
-            } else {
-                self.pending.append((key, work))
-            }
-            self.drain()
-        }
-    }
-
-    private func drain() {
-        guard !inFlight, let next = pending.first else { return }
-        pending.removeFirst()
-        inFlight = true
-        next.work()
-        inFlight = false
-        drain()
-    }
-}
-
 final class MixerModel: ObservableObject {
     @Published var connected = false
     @Published var lastError: String?
