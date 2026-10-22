@@ -32,7 +32,7 @@ struct EditableValue: View {
             if editing {
                 TextField("", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Theme.text)
                     .focused($focused)
@@ -41,7 +41,7 @@ struct EditableValue: View {
                     .onChange(of: focused) { f in if !f { commit() } }
             } else {
                 Text(text)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Theme.secondary)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -54,7 +54,7 @@ struct EditableValue: View {
                     }
             }
         }
-        .frame(width: width, height: 12)
+        .frame(width: width, height: 14)
     }
 
     private func commit() {
@@ -90,7 +90,7 @@ struct VFader: View {
                 .foregroundStyle(Theme.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            EditableValue(text: display, width: faderColW - 2, onCommit: onText)
+            EditableValue(text: display, width: 38, onCommit: onText)
         }
         .frame(width: faderColW)
     }
