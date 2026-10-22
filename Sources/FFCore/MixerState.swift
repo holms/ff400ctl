@@ -81,16 +81,33 @@ public struct MixerState: Codable, Equatable {
         return dir.appendingPathComponent("state.json")
     }
 
+    /// Defensive: arrays must be the right size even if the file was
+    /// hand-edited or written by a stale build. Pads missing cells with
+    /// safe defaults and truncates over-long arrays.
+    public func normalized() -> MixerState {
+        var s = self
+        let n = Fireface400.channelCount
+        func size<T>(_ a: inout [T], _ count: Int, _ fill: T) {
+            if a.count < count { a += [T](repeating: fill, count: count - a.count) }
+            else if a.count > count { a = Array(a.prefix(count)) }
+        }
+        size(&s.input, n * n, 0)
+        size(&s.playback, n * n, 0)
+        size(&s.output, n, Fireface400.unityGain)
+        size(&s.inputMute, n, false)
+        size(&s.inputPhase, n, false)
+        size(&s.inputSolo, n, false)
+        size(&s.outputMute, n, false)
+        size(&s.outputStereo, n / 2, false)
+        return s
+    }
+
     public static func load() -> MixerState {
         let url = storeURL
         guard let data = try? Data(contentsOf: url),
-              var state = try? JSONDecoder().decode(MixerState.self, from: data)
+              let state = try? JSONDecoder().decode(MixerState.self, from: data)
         else { return MixerState() }
-        // Defensive: arrays must be the right size even if file is stale.
-        if state.input.count != 324 { state.input = MixerState().input }
-        if state.playback.count != 324 { state.playback = MixerState().playback }
-        if state.output.count != Fireface400.channelCount { state.output = MixerState().output }
-        return state
+        return state.normalized()
     }
 
     public func save() {
@@ -127,12 +144,9 @@ public struct MixerState: Codable, Equatable {
     public static func loadSnapshot(name: String) -> MixerState? {
         let url = snapshotURL(name: name)
         guard let data = try? Data(contentsOf: url),
-              var state = try? JSONDecoder().decode(MixerState.self, from: data)
+              let state = try? JSONDecoder().decode(MixerState.self, from: data)
         else { return nil }
-        if state.input.count != 324 { state.input = MixerState().input }
-        if state.playback.count != 324 { state.playback = MixerState().playback }
-        if state.output.count != Fireface400.channelCount { state.output = MixerState().output }
-        return state
+        return state.normalized()
     }
 
     public static func snapshotNames() -> [String] {

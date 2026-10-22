@@ -21,6 +21,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   cells
 - Tray app only persisted state via "Save state"; every hw write now
   submits a coalesced save and `willTerminate` flushes + saves
+- Hand-edited state/snapshot files with short `inputMute`/`inputPhase`/
+  `inputSolo`/`outputMute`/`outputStereo` arrays crashed on index —
+  `MixerState.normalized()` pads/truncates all arrays in both loaders
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)

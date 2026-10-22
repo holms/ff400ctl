@@ -383,5 +383,23 @@ do {
     check(!c5.setBusPair(a: 18, b: 0), "setBusPair a=18 rejected")
     check(!c5.setBusPair(a: 0, b: -1), "setBusPair b=-1 rejected")
 }
+// MARK: - MixerState.normalized
+
+do {
+    var s = MixerState()
+    s.inputMute = [true]
+    s.outputStereo = []
+    s.input = [0x8000]
+    let data = try JSONEncoder().encode(s)
+    let back = try JSONDecoder().decode(MixerState.self, from: data).normalized()
+    eq(back.inputMute.count, 18, "inputMute padded to 18")
+    check(back.inputMute[0], "inputMute[0] kept")
+    eq(back.outputStereo.count, 9, "outputStereo padded to 9")
+    eq(back.input.count, 324, "input padded to 324")
+    eq(back.input[0], 0x8000, "input[0] kept")
+    var over = MixerState()
+    over.outputMute = [Bool](repeating: true, count: 30)
+    eq(over.normalized().outputMute.count, 18, "outputMute truncated to 18")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)
