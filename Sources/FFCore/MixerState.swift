@@ -95,4 +95,51 @@ public struct MixerState: Codable, Equatable {
             try? data.write(to: url, options: .atomic)
         }
     }
+
+    // MARK: - Snapshots (named presets, TotalMix "workspace" style)
+
+    public static var snapshotsDir: URL {
+        storeURL.deletingLastPathComponent().appendingPathComponent("snapshots", isDirectory: true)
+    }
+
+    public static func snapshotURL(name: String) -> URL {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let safe = name.components(separatedBy: allowed.inverted).joined()
+        return snapshotsDir.appendingPathComponent("\(safe.isEmpty ? "snapshot" : safe).json")
+    }
+
+    public func saveSnapshot(name: String) -> Bool {
+        let url = MixerState.snapshotURL(name: name)
+        do {
+            try FileManager.default.createDirectory(at: MixerState.snapshotsDir,
+                                                    withIntermediateDirectories: true)
+            try JSONEncoder().encode(self).write(to: url, options: .atomic)
+            return true
+        } catch { return false }
+    }
+
+    public static func loadSnapshot(name: String) -> MixerState? {
+        let url = snapshotURL(name: name)
+        guard let data = try? Data(contentsOf: url),
+              var state = try? JSONDecoder().decode(MixerState.self, from: data)
+        else { return nil }
+        if state.input.count != 324 { state.input = MixerState().input }
+        if state.playback.count != 324 { state.playback = MixerState().playback }
+        if state.output.count != Fireface400.channelCount { state.output = MixerState().output }
+        return state
+    }
+
+    public static func snapshotNames() -> [String] {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: snapshotsDir, includingPropertiesForKeys: nil)
+        else { return [] }
+        return files.filter { $0.pathExtension == "json" }
+            .map { $0.deletingPathExtension().lastPathComponent }.sorted()
+    }
+
+    public static func deleteSnapshot(name: String) -> Bool {
+        let url = snapshotURL(name: name)
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        return (try? FileManager.default.removeItem(at: url)) != nil
+    }
 }

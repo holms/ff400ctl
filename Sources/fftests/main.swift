@@ -230,5 +230,48 @@ do {
     _ = ctl5.setOutputMute(ch: 0, on: false)
     eq(writes.last(where: { $0.0 == 0x8008_0f80 })!.1, 0x8000, "unmute restores out fader")
 }
+// MARK: - Gain argument parsing (CLI automation)
+
+do {
+    eq(Fireface400.parseGainArgument("0x8000"), 0x8000, "parse hex")
+    eq(Fireface400.parseGainArgument("32768"), 0x8000, "parse decimal")
+    eq(Fireface400.parseGainArgument("-6dB"), Fireface400.gain(fromDB: -6), "parse absolute dB")
+    eq(Fireface400.parseGainArgument("+3dB", current: 0x8000),
+       Fireface400.gain(fromDB: 3), "relative +3dB on unity")
+    eq(Fireface400.parseGainArgument("-3dB", current: 0x8000),
+       Fireface400.gain(fromDB: -3), "relative -3dB on unity")
+    let half = Fireface400.gain(fromDB: -6)
+    eq(Fireface400.parseGainArgument("+6dB", current: half),
+       Fireface400.gain(fromDB: 0), "relative +6dB on -6dB cell")
+    eq(Fireface400.parseGainArgument("+3dB", current: 0),
+       Fireface400.gain(fromDB: -87), "relative step on muted cell starts at -90dB")
+    eq(Fireface400.parseGainArgument("+3dB"), Fireface400.gain(fromDB: 3),
+       "+3dB without current falls back to absolute")
+    check(Fireface400.parseGainArgument("bogus") == nil, "garbage rejected")
+    check(Fireface400.parseGainArgument("+3dB", current: 0x8000)! > 0x8000,
+          "relative step increases value")
+}
+
+// MARK: - Snapshots
+
+do {
+    var s = MixerState()
+    s.input[MixerState.index(src: 3, dest: 7)] = 0x1234
+    s.outputMute[2] = true
+    s.config.phantom1 = true
+    check(s.saveSnapshot(name: "fftest-snap"), "snapshot saves")
+    check(MixerState.snapshotNames().contains("fftest-snap"), "snapshot listed")
+    let loaded = MixerState.loadSnapshot(name: "fftest-snap")
+    check(loaded != nil, "snapshot loads")
+    eq(loaded?.input[MixerState.index(src: 3, dest: 7)], 0x1234, "cell survives snapshot")
+    check(loaded?.outputMute[2] == true, "flag survives snapshot")
+    check(loaded?.config.phantom1 == true, "config survives snapshot")
+    check(MixerState.loadSnapshot(name: "no-such-snap-xyz") == nil, "missing snapshot -> nil")
+    check(MixerState.deleteSnapshot(name: "fftest-snap"), "snapshot deletes")
+    check(!MixerState.snapshotNames().contains("fftest-snap"), "snapshot gone after delete")
+    // names sanitize to a filename-safe form
+    check(MixerState.snapshotURL(name: "../etc/passwd").lastPathComponent == "etcpasswd.json",
+          "snapshot name sanitized")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

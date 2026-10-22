@@ -4,6 +4,24 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Added
+- Automation commands (CLI):
+  - `ffctl save|load|snaps|rmsnap` — named mix snapshots
+    (TotalMix "workspace" style) stored in
+    `~/Library/Application Support/ff400ctl/snapshots/`
+  - `ffctl state --json` — machine-readable state export
+  - `ffctl batch <file|->` — run command scripts over one user-client
+    session (# comments supported, stops on first failure)
+  - Relative gain steps: `ffctl outvol 0 -3dB` / `mix 0 0 +3dB` for
+    hotkey-driven volume automation (new `parseGainArgument` in FFCore)
+- 20 new unit checks (117 total): gain-arg parsing incl. relative mode,
+  snapshot save/load/list/delete round-trip, name sanitization
+
+### Fixed
+- `parseGain`/`parseGainArgument` no longer crashes on decimal/hex input —
+  `UInt32(_, radix: 0)` is invalid Swift (radix must be 2...36); explicit
+  `0x` prefix handling added
+
 ## [0.3.0] - 2026-10-22
 
 ### Added

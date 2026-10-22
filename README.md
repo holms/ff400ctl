@@ -84,6 +84,12 @@ ffctl solo 0 on          # exclusive solo on the monitor bus
 ffctl phase 0 on         # phase invert (negative cell gain)
 ffctl outmute 0 on       # mute output 1
 ffctl mono on            # lock AN1/2 pair to mono
+ffctl save vocal         # snapshot the whole mix state
+ffctl load vocal         # restore + apply it
+ffctl snaps              # list snapshots
+ffctl state --json       # machine-readable state for scripts
+ffctl batch script.txt   # run many commands over one session
+ffctl outvol 0 -3dB      # relative steps — hotkey-friendly
 ffctl 1to1               # playback i -> out i at 0 dB (Mac audio routing)
 ffctl mute-all           # zero every input fader
 ffctl apply              # rewrite entire saved state

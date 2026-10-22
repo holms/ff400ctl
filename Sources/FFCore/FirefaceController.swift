@@ -113,6 +113,10 @@ public final class FirefaceController {
     }
 
     public func saveState() { state.save() }
+
+    /// Replace the tracked state (e.g. after loading a snapshot).
+    /// Call `applyAll()` afterwards to push it to the hardware.
+    public func restoreState(_ newState: MixerState) { state = newState }
 }
 
 // MARK: - Device config block (phantom, pads, levels, clock)

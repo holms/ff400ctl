@@ -52,6 +52,21 @@ public enum Fireface400 {
         return 20.0 * log10(Double(gain) / 32768.0)
     }
 
+    /// Parse a gain argument: absolute hex (`0x8000`), decimal, dB (`-6dB`),
+    /// or a relative dB step (`+3dB` / `-3dB`) applied to `current`.
+    /// A relative step on a muted cell (0) starts from -90 dB.
+    public static func parseGainArgument(_ s: String, current: UInt32? = nil) -> UInt32? {
+        if s.hasSuffix("dB"), let d = Double(s.dropLast(2)) {
+            if s.hasPrefix("+") || s.hasPrefix("-"), let current {
+                let base = current == 0 ? -90.0 : db(fromGain: current)
+                return gain(fromDB: base + d)
+            }
+            return gain(fromDB: d)
+        }
+        if s.hasPrefix("0x") || s.hasPrefix("0X") { return UInt32(s.dropFirst(2), radix: 16) }
+        return UInt32(s)
+    }
+
     // MARK: - Mixer addressing
 
     public enum MixKind {
