@@ -14,6 +14,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
     session (# comments supported, stops on first failure)
   - Relative gain steps: `ffctl outvol 0 -3dB` / `mix 0 0 +3dB` for
     hotkey-driven volume automation (new `parseGainArgument` in FFCore)
+- `CLI.md` — full command reference (channel numbering, gain syntax,
+  automation recipes, file locations); README trimmed to a summary + link
 - 20 new unit checks (117 total): gain-arg parsing incl. relative mode,
   snapshot save/load/list/delete round-trip, name sanitization
 

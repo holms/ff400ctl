@@ -68,35 +68,20 @@ Menu-bar slider icon → click:
 
 ### ffctl
 
+Full reference: **[CLI.md](CLI.md)** — every command, channel numbering,
+gain syntax, automation recipes and file locations. Quick taste:
+
 ```sh
 ffctl mon 0 0 1          # input 1 -> analog outs 1,2 at 0 dB
 ffctl mix 0 0 -6dB       # one input fader cell
-ffctl pb 0 0 0x8000      # playback (Mac audio) fader cell
-ffctl outvol 0 -3dB      # output master fader (syncs hw amp gain too)
-ffctl gain 0 20          # mic 1 preamp to 20 dB
+ffctl outvol 0 -3dB      # output master fader (relative step)
 ffctl phantom 1 on       # +48V on mic input 1
-ffctl pad 3 on           # -20 dB pad on input 3
-ffctl instr 4 on         # instrument mode on input 4
-ffctl cfg ilevel 4dbu    # rear input reference level
-ffctl config             # show tracked config block
 ffctl mute 0 on          # mute input 1 on all outputs
-ffctl solo 0 on          # exclusive solo on the monitor bus
-ffctl phase 0 on         # phase invert (negative cell gain)
-ffctl outmute 0 on       # mute output 1
-ffctl mono on            # lock AN1/2 pair to mono
 ffctl save vocal         # snapshot the whole mix state
 ffctl load vocal         # restore + apply it
-ffctl snaps              # list snapshots
-ffctl state --json       # machine-readable state for scripts
 ffctl batch script.txt   # run many commands over one session
-ffctl outvol 0 -3dB      # relative steps — hotkey-friendly
-ffctl 1to1               # playback i -> out i at 0 dB (Mac audio routing)
-ffctl mute-all           # zero every input fader
-ffctl apply              # rewrite entire saved state
-ffctl state              # dump tracked mix
+ffctl state --json       # machine-readable state for scripts
 ```
-
-Gain arguments accept hex (`0x8000`), decimal, or dB (`-6dB`).
 
 ## How it works
 
