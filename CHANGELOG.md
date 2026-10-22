@@ -5,6 +5,7 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- "Launch at login" footer toggle in FFTray (SMAppService, macOS 13+)
 - FFTray app icon (RME Fireface 400 artwork, bundled as AppIcon.icns;
   the menu-bar item keeps its SF Symbol)
 - Single version source `FFVersion.string` — `ffctl --version` prints

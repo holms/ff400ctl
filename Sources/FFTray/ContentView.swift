@@ -428,6 +428,11 @@ struct ContentView: View {
                 Button("Detach") { model.openDetached() }
             }
             Spacer()
+            Toggle("Launch at login", isOn: Binding(
+                get: { model.launchAtLogin },
+                set: { model.setLaunchAtLogin($0) }))
+                .toggleStyle(.checkbox)
+                .font(.caption2).foregroundStyle(Theme.secondary)
             Text("mixer RAM is volatile — re-apply after power cycle")
                 .font(.caption2).foregroundStyle(Theme.secondary)
             Text("v\(FFVersion.string)")

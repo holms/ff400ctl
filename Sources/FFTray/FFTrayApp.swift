@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import OSLog
+import ServiceManagement
 import FFCore
 
 private let trayLog = Logger(subsystem: "net.holms.fftray", category: "ui")
@@ -89,6 +90,8 @@ final class MixerModel: NSObject, ObservableObject {
     @Published var inputSolo = [Bool](repeating: false, count: 18)
     @Published var outputMute = [Bool](repeating: false, count: 18)
     @Published var monoBus = false
+    /// Mirrors SMAppService.mainApp.status; re-read after every toggle.
+    @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     private var ctl: FirefaceController?
     private let hwq = WriteCoalescer()
@@ -131,6 +134,17 @@ final class MixerModel: NSObject, ObservableObject {
 
     deinit {
         stateWatcher?.cancel()
+    }
+
+    /// Register/unregister FFTray as a login item (macOS 13+ SMAppService).
+    func setLaunchAtLogin(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
+        } catch {
+            lastError = "launch at login: \(error.localizedDescription)"
+        }
+        launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
     /// Push a MixerState into every @Published property.

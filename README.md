@@ -69,6 +69,8 @@ Menu-bar slider icon → click:
 - **Mic 1/2** — preamp gain 0–65 dB + **48V** phantom toggles;
   **In 3/4** — line gain + **PAD**/**INST** toggles.
   All four write the 3-quadlet device config block at `0x80100514`.
+- **Launch at login** — footer toggle registers/unregisters the app as
+  a login item (SMAppService, macOS 13+).
 - **Re-apply mix** — rewrites all tracked cells (mixer RAM is volatile —
   the unit restores its flash-stored mix on every power cycle); output
   amp gains are re-derived from the faders rather than replayed raw.
