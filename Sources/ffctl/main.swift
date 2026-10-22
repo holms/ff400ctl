@@ -57,13 +57,31 @@ if args[1] == "--version" || args[1] == "version" {
     exit(0)
 }
 
+// FFCTL_FAKE_HW=<logfile> runs against a fake device (no ASFW connect):
+// every register write is appended to the log as "addr value" lines.
+// FFCTL_FAKE_FAIL=1 makes the fake device reject every write.
+// Combined with FFCTL_STATE_DIR this is a hardware-free dry-run mode —
+// used by scripts/e2e-cli.sh.
 let ctl: FirefaceController
-do {
-    ctl = try FirefaceController()
-} catch {
-    print("error: cannot connect to ASFWDriver user client: \(error)")
-    print("(is ASFW installed and is this binary signed with the userclient-access entitlement?)")
-    exit(1)
+if let fakeLog = ProcessInfo.processInfo.environment["FFCTL_FAKE_HW"], !fakeLog.isEmpty {
+    if !FileManager.default.fileExists(atPath: fakeLog) {
+        FileManager.default.createFile(atPath: fakeLog, contents: nil)
+    }
+    let fh = try? FileHandle(forWritingTo: URL(fileURLWithPath: fakeLog))
+    fh?.seekToEndOfFile()
+    let fail = ProcessInfo.processInfo.environment["FFCTL_FAKE_FAIL"] == "1"
+    ctl = FirefaceController(testing: .load()) { addr, value in
+        fh?.write(String(format: "%08x %08x\n", addr, value).data(using: .utf8)!)
+        return !fail
+    }
+} else {
+    do {
+        ctl = try FirefaceController()
+    } catch {
+        print("error: cannot connect to ASFWDriver user client: \(error)")
+        print("(is ASFW installed and is this binary signed with the userclient-access entitlement?)")
+        exit(1)
+    }
 }
 
 func ok(_ b: Bool, _ what: String) -> Bool {

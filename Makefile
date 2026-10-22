@@ -4,7 +4,7 @@ APP  := FFTray.app
 VER  ?= $(shell sed -n 's/.*string = "\(.*\)".*/\1/p' Sources/FFCore/Version.swift)
 DMG  := ff400ctl-$(VER).dmg
 
-.PHONY: all cli app test install clean universal dmg print-version
+.PHONY: all cli app test e2e hwtest install clean universal dmg print-version
 
 print-version:
 	@echo $(VER)
@@ -74,6 +74,16 @@ dmg: universal
 
 test:
 	swift run fftests
+
+# CLI end-to-end: real ffctl binary against a fake device (no hardware).
+e2e:
+	swift build --product ffctl
+	bash scripts/e2e-cli.sh
+
+# Hardware smoke test — only when a powered FF400 is connected.
+hwtest:
+	swift build --product ffctl
+	bash scripts/hardware-smoke.sh
 
 install: all
 	cp $(BIN)/ffctl /usr/local/bin/ffctl
