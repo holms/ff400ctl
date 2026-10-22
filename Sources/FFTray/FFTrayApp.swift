@@ -165,10 +165,9 @@ final class MixerModel: ObservableObject {
         output[ch] = gain
         let peer = ch ^ 1, linked = outputStereo[ch / 2]
         if linked { output[peer] = gain }
-        hw("out.\(ch / 2)") { c in
-            var ok = c.setOutputFader(ch: ch, gain: gain)
-            if linked { ok = c.setOutputFader(ch: peer, gain: gain) && ok }
-            return ok
+        hw("out.\(ch)") { c in c.setOutputFader(ch: ch, gain: gain) }
+        if linked {
+            hw("out.\(peer)") { c in c.setOutputFader(ch: peer, gain: gain) }
         }
     }
 
@@ -179,7 +178,7 @@ final class MixerModel: ObservableObject {
             // adopt L's fader value for both, like TotalMix
             let g = output[pair * 2]
             output[pair * 2 + 1] = g
-            hw("out.\(pair)") { c in c.setOutputFader(ch: pair * 2 + 1, gain: g) }
+            hw("out.\(pair * 2 + 1)") { c in c.setOutputFader(ch: pair * 2 + 1, gain: g) }
         }
         hw("stereo.\(pair)") { c in c.setOutputStereo(pair: pair, on: on) }
     }
@@ -202,17 +201,17 @@ final class MixerModel: ObservableObject {
 
     func setPhantom(_ i: Int, on: Bool) {
         phantom[i] = on
-        hw("cfg", "config write failed") { c in c.setPhantom(ch: i, on: on) }
+        hw("cfg.phantom.\(i)", "config write failed") { c in c.setPhantom(ch: i, on: on) }
     }
 
     func setPad(_ i: Int, on: Bool) {
         pad[i] = on
-        hw("cfg", "config write failed") { c in c.setPad(ch: i + 2, on: on) }
+        hw("cfg.pad.\(i)", "config write failed") { c in c.setPad(ch: i + 2, on: on) }
     }
 
     func setInstr(_ i: Int, on: Bool) {
         instr[i] = on
-        hw("cfg", "config write failed") { c in c.setInstrument(ch: i + 2, on: on) }
+        hw("cfg.instr.\(i)", "config write failed") { c in c.setInstrument(ch: i + 2, on: on) }
     }
 
     // MARK: - Bulk

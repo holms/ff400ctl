@@ -8,6 +8,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 - WriteCoalescer never coalesced: submissions were queued behind the
   running work, so every submit executed. Moved to FFCore and
   reimplemented with a lock + single drain loop; `waitUntilIdle()` added
+- Shared coalescing keys dropped distinct writes: phantom/pad/instr all
+  used key "cfg", and both channels of a stereo pair used "out.<pair>" —
+  keys are now per-flag / per-channel
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)
