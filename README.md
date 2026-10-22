@@ -35,7 +35,7 @@ TotalMix/FFADO use, through ASFW's raw `AsyncWrite` user-client method.
 
 ```sh
 make            # builds release ffctl + FFTray.app, ad-hoc signs both
-make test       # 70 unit checks: address math, dB conversion, state codec
+make test       # 124 unit checks: address math, dB conversion, state codec
 make install    # ffctl -> /usr/local/bin, FFTray.app -> /Applications
 ```
 
@@ -56,8 +56,10 @@ Menu-bar slider icon → click:
 - **INPUTS → bus** — per-input send faders into the selected monitor-bus
   pair, with **M** (mute), **S** (exclusive solo) and **Ø** (phase invert)
   chips per channel, and a **MONO** lock for the pair.
-- **OUTPUTS** — 18 master faders with per-channel **M** (they also sync the
-  FF400's hardware amp-gain register, like TotalMix does).
+- **OUTPUTS** — 18 master faders in stereo pairs with per-channel **M**
+  (they also sync the FF400's hardware amp-gain register, like TotalMix
+  does). The **ST** chip links a pair into one fader — TotalMix's stereo
+  button.
 - **Mic 1/2** — preamp gain 0–65 dB + **48V** phantom toggles;
   **In 3/4** — line gain + **PAD**/**INST** toggles.
   All four write the 3-quadlet device config block at `0x80100514`.
@@ -98,6 +100,7 @@ historically cooperated with:
 | channel mute | `0x801c0000` | 28-quadlet PCM fetch mask |
 | output rec | `0x801c0080` | 28-quadlet output record flags |
 | config block | `0x80100514` | 3 quadlets, write-only: phantom, pads, inst, levels, clock |
+| meter block | `0x80100000` | ~648-byte level readback (needs working reads — see below) |
 
 **Config block** (`0x80100514`, 3 quadlets, block write / selector 45):
 phantom `q0` bits `0x01`/0x80 (mic 1/2), pads `0x100`/`0x02` (in 3/4),
@@ -132,7 +135,11 @@ status listener, selector 10).
   AR response never gets matched (`AwaitingAR → TimedOut`), while
   driver-internal reads work. Writes only need the ack, so they land
   reliably (`ackComplete`) — which is why this tool is write-oriented and
-  tracks mixer state in software, like FFADO's GUI does.
+  tracks mixer state in software, like FFADO's GUI does. Fixing this
+  would also unlock **hardware meters**: per Takashi Sakamoto's ALSA
+  `firewire-fireface-protocols`, the FF400 exposes a ~648-byte level
+  block at `0x80100000` (inputs/stream/outputs, −90…0 dBFS, step 0x100,
+  overload bits) via one block read.
 - **Multiple OHCI services** are possible; `ffctl`/`FFTray` write on every
   `ASFWDriver` connection and treat the write as applied if any
   transaction completes. The stray writes on the wrong bus fail with

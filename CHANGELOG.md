@@ -4,19 +4,7 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
-### Added
-- Output stereo-link (TotalMix stereo button): `ST` chips on the tray
-  output strip merge a pair into one fader; writes mirror to both
-  channels and adopt the L value on link. `ffctl stereo <pair> on|off`,
-  persisted in `MixerState.outputStereo`
-- Write coalescing in FFTray: fader drags update the UI instantly and
-  hardware writes drain on a serial background queue with latest-value-
-  wins per key — eliminates drag lag and stale-write backlogs
-- 7 new unit checks (124 total): stereo-link bounds + Codable persistence
-
-### Changed
-- FFTray model methods are now optimistic: UI state updates immediately,
-  hardware failures surface in the header instead of blocking the fader
+## [0.4.0] - 2026-10-23
 
 ### Added
 - Automation commands (CLI):
@@ -30,13 +18,29 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
     hotkey-driven volume automation (new `parseGainArgument` in FFCore)
 - `CLI.md` — full command reference (channel numbering, gain syntax,
   automation recipes, file locations); README trimmed to a summary + link
-- 20 new unit checks (117 total): gain-arg parsing incl. relative mode,
-  snapshot save/load/list/delete round-trip, name sanitization
+- Output stereo-link (TotalMix stereo button): `ST` chips on the tray
+  output strip merge a pair into one fader; writes mirror to both
+  channels and adopt the L value on link. `ffctl stereo <pair> on|off`,
+  persisted in `MixerState.outputStereo`
+- Write coalescing in FFTray: fader drags update the UI instantly and
+  hardware writes drain on a serial background queue with latest-value-
+  wins per key — eliminates drag lag and stale-write backlogs
+- Documented the hardware meter block at `0x80100000` (readable per
+  Takashi Sakamoto's ALSA implementation — blocked only by ASFW's
+  user-client read path)
+
+### Changed
+- FFTray model methods are now optimistic: UI state updates immediately,
+  hardware failures surface in the header instead of blocking the fader
+- Larger flag chips (M/S/Ø, 48V, PAD, INST, ST, MONO): 10pt text, wider
+  hit targets
 
 ### Fixed
 - `parseGain`/`parseGainArgument` no longer crashes on decimal/hex input —
   `UInt32(_, radix: 0)` is invalid Swift (radix must be 2...36); explicit
   `0x` prefix handling added
+- 124 unit checks: gain-arg parsing incl. relative mode, snapshot
+  round-trip, stereo-link bounds + Codable persistence
 
 ## [0.3.0] - 2026-10-22
 
@@ -69,7 +73,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   - Input/output/phones reference levels, clock master, sync ref, SPDIF opts
 - `AsyncBlockWrite` (selector 45) support in `ASFWClient`
 - CLI: `phantom`, `pad`, `instr`, `cfg`, `config`
-- Tray UI: 48V chips under Mic faders, PAD/INST chips under In 3/4
+- Tray UI revamp: larger vertical faders, click-to-edit dB values,
+  INPUTS→bus send strip with monitor-bus picker, PREAMP strip with
+  mic/line gain faders, 48V/PAD/INST chips
 - 13 new unit checks (83 total), incl. the FFADO reference vector `0x00020811`
 - Config defaults match observed status mirror: clockMaster, spdifPro,
   syncRef=adat1
@@ -108,7 +114,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 - Rapid transaction bursts can wedge the device's AR engine — keep write
   bursts small
 
-[Unreleased]: https://github.com/holms/ff400ctl/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/holms/ff400ctl/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/holms/ff400ctl/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/holms/ff400ctl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/holms/ff400ctl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/holms/ff400ctl/releases/tag/v0.1.0
