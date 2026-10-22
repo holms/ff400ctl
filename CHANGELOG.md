@@ -31,6 +31,13 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 - `ffctl outvol` ignored the stereo link — the peer channel follows now
 - Fader value labels (38pt) overlapped neighboring 30pt columns —
   columns widened to 40pt
+- Re-clicking "Detach" re-centered the detached window over the user's
+  position; center only on first open. The detached window is now
+  Cmd-Tab reachable (`.regular` activation policy while open)
+
+### Added
+- **Detach** button: opens the mixer in a normal titled window that stays
+  open while you work in other apps (the tray panel closes on focus loss)
 
 ### Changed
 - Fader value labels enlarged 9pt → 11pt (wider edit field)

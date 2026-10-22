@@ -266,10 +266,22 @@ final class MixerModel: NSObject, ObservableObject {
             w.title = "Fireface 400 Mixer"
             w.styleMask = [.titled, .closable, .miniaturizable]
             w.isReleasedWhenClosed = false
+            w.delegate = self
+            w.center()
             detachedWindow = w
+            // Make the window Cmd-Tab reachable while it's open.
+            NSApp.setActivationPolicy(.regular)
         }
-        detachedWindow?.center()
         detachedWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+extension MixerModel: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        if notification.object as? NSWindow === detachedWindow {
+            detachedWindow = nil
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 }
