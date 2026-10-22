@@ -41,13 +41,14 @@ struct EditableValue: View {
                     .onExitCommand { editing = false }
                     .onChange(of: focused) { f in if !f { commit() } }
             } else {
-                Text(text)
+                label
                     .font(.system(size: fontSize, design: .monospaced))
                     .foregroundStyle(Theme.secondary)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         draft = text.replacingOccurrences(of: "dB", with: "")
                             .replacingOccurrences(of: "−", with: "-")
+                            .replacingOccurrences(of: "-∞", with: "-90")
                             .replacingOccurrences(of: "∞", with: "-90")
                             .trimmingCharacters(in: .whitespaces)
                         editing = true
@@ -56,6 +57,15 @@ struct EditableValue: View {
             }
         }
         .frame(width: width, height: 14)
+    }
+
+    /// The monospaced ∞ glyph is tiny next to digits — draw it in the
+    /// proportional system font at a larger size so "-∞" reads like "0.0".
+    private var label: Text {
+        guard let r = text.range(of: "∞") else { return Text(text) }
+        return Text(text[..<r.lowerBound])
+            + Text("∞").font(.system(size: fontSize * 1.45, weight: .medium))
+            + Text(text[r.upperBound...])
     }
 
     private func commit() {
