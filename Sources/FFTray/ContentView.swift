@@ -421,28 +421,31 @@ struct ContentView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            Button("Re-apply mix") { model.applyAll() }
-            Button("Save state") { model.save() }
-            if !detached {
-                Button("Detach") { model.openDetached() }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Button("Re-apply mix") { model.applyAll() }
+                Button("Save state") { model.save() }
+                if !detached {
+                    Button("Detach") { model.openDetached() }
+                }
+                Spacer()
+                Text("v\(FFVersion.string)")
+                    .font(.caption2).foregroundStyle(Theme.secondary)
+                if !detached {
+                    Button("Quit") { NSApplication.shared.terminate(nil) }
+                }
             }
-            Spacer()
-            Toggle("Launch at login", isOn: Binding(
-                get: { model.launchAtLogin },
-                set: { model.setLaunchAtLogin($0) }))
-                .toggleStyle(.checkbox)
-                .font(.caption2).foregroundStyle(Theme.secondary)
-            Toggle("Auto re-apply", isOn: $model.autoReapply)
-                .toggleStyle(.checkbox)
-                .font(.caption2).foregroundStyle(Theme.secondary)
-            Text("mixer RAM is volatile — re-apply after power cycle")
-                .font(.caption2).foregroundStyle(Theme.secondary)
-            Text("v\(FFVersion.string)")
-                .font(.caption2).foregroundStyle(Theme.secondary)
-            if !detached {
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+            HStack(spacing: 12) {
+                Toggle("Auto re-apply after power cycle", isOn: $model.autoReapply)
+                    .toggleStyle(.checkbox)
+                Toggle("Launch at login", isOn: Binding(
+                    get: { model.launchAtLogin },
+                    set: { model.setLaunchAtLogin($0) }))
+                    .toggleStyle(.checkbox)
+                Spacer()
+                Text("mixer RAM is volatile")
             }
+            .font(.caption2).foregroundStyle(Theme.secondary)
         }
         .buttonStyle(.borderless)
         .font(.caption)
