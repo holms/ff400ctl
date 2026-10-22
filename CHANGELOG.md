@@ -5,6 +5,15 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- End-to-end tests: `make e2e` drives the real `ffctl` binary against a
+  fake device (`FFCTL_FAKE_HW`/`FFCTL_STATE_DIR`/`FFCTL_FAKE_FAIL` env
+  vars — also a usable dry-run mode) in CI; `make hwtest` runs an
+  opt-in hardware smoke test (connect + completed write transaction)
+- `MixerModel` extracted into an `FFModel` target with an injectable
+  controller — UI actions (sends, MAIN, ST links, matrix, preamp chips,
+  bus/solo, mono, disconnected errors) are now covered by fftests
+- State watcher extracted into `ExternalStateWatcher.shouldAdopt` +
+  `DirectoryWatcher` with dedicated tests
 - Dependabot keeps GitHub Actions versions current (weekly PRs)
 - GitHub issue templates (bug report / feature request) and
   CONTRIBUTING.md
@@ -30,6 +39,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   hotkey scripts)
 
 ### Fixed
+- `lastSaved` was written on the main thread at termination while the
+  state reload path read it on the hardware queue — a small race; the
+  shutdown save now goes through the same queue
 - The footer's power-cycle note had been shortened to "mixer RAM is
   volatile"; it now reflects the Auto re-apply setting ("re-applied
   automatically after power cycle", or an orange "re-apply after power

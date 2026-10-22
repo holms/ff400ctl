@@ -17,6 +17,21 @@ saves the tracked mixer state to
 `~/Library/Application Support/ff400ctl/state.json` before exiting.
 Exit code is `0` on success, `1` on failure — safe for scripting.
 
+## Dry-run / testing environment variables
+
+| Variable | Effect |
+|----------|--------|
+| `FFCTL_STATE_DIR=<dir>` | Read/write `state.json` and `snapshots/` under `<dir>` instead of Application Support. |
+| `FFCTL_FAKE_HW=<file>` | Don't connect to ASFW; run against a fake device. Every register write is appended to `<file>` as `addr value` hex lines — useful for checking scripts and for the e2e tests. |
+| `FFCTL_FAKE_FAIL=1` | With `FFCTL_FAKE_HW`: the fake device rejects every write (tests failure paths). |
+
+Example:
+
+```sh
+FFCTL_STATE_DIR=/tmp/mix FFCTL_FAKE_HW=/tmp/mix/writes.log ffctl main -6dB
+cat /tmp/mix/writes.log   # the register writes the device would have got
+```
+
 ## Gain arguments
 
 All commands taking a gain accept four forms:
