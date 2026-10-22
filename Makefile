@@ -81,8 +81,10 @@ e2e:
 	bash scripts/e2e-cli.sh
 
 # Hardware smoke test — only when a powered FF400 is connected.
+# The user-client access entitlement is required even for ad-hoc debug.
 hwtest:
 	swift build --product ffctl
+	codesign -s - --force --entitlements $(ENT) .build/debug/ffctl
 	bash scripts/hardware-smoke.sh
 
 install: all
