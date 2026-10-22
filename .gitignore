@@ -1,0 +1,4 @@
+.build/
+FFTray.app/
+*.dmg
+.DS_Store
