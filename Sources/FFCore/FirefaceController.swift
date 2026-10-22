@@ -99,13 +99,16 @@ public final class FirefaceController {
                 setPlaybackFader(src: src, dest: dest, gain: state.playback[i]) ? (ok += 1) : (fail += 1)
             }
         }
+        // setOutputFader writes the mute-aware fader AND re-derives the
+        // hw amp gain from it — stale ampGains entries (e.g. saved before
+        // the output-encoding fix) are corrected rather than replayed.
         for ch in 0..<Fireface400.channelCount {
-            let v: UInt32 = state.outputMute[ch] ? 0 : state.output[ch]
-            if let addr = Fireface400.outputFaderAddress(ch: ch),
-               write(addr, v) { ok += 1 } else { fail += 1 }
+            setOutputFader(ch: ch, gain: state.output[ch]) ? (ok += 1) : (fail += 1)
         }
+        // Replay tracked amp gains for inputs only (0-3 = mic1/2, in3/4);
+        // output gains are covered by the fader loop above.
         for (key, devval) in state.ampGains {
-            guard let idx = Int(key), idx < 22 else { continue }
+            guard let idx = Int(key), idx <= 3 else { continue }
             let regval = UInt32(idx << 16) | devval
             write(Fireface400.gainRegister, regval) ? (ok += 1) : (fail += 1)
         }

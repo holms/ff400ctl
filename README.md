@@ -64,7 +64,8 @@ Menu-bar slider icon → click:
   **In 3/4** — line gain + **PAD**/**INST** toggles.
   All four write the 3-quadlet device config block at `0x80100514`.
 - **Re-apply mix** — rewrites all tracked cells (mixer RAM is volatile —
-  the unit restores its flash-stored mix on every power cycle).
+  the unit restores its flash-stored mix on every power cycle); output
+  amp gains are re-derived from the faders rather than replayed raw.
 - **Save state** — persists the intended mix to
   `~/Library/Application Support/ff400ctl/state.json`.
 

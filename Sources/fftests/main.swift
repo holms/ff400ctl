@@ -401,5 +401,25 @@ do {
     over.outputMute = [Bool](repeating: true, count: 30)
     eq(over.normalized().outputMute.count, 18, "outputMute truncated to 18")
 }
+// MARK: - applyAll re-derives output amp gains (stale 2x values dropped)
+
+do {
+    var st = MixerState()
+    st.output[0] = Fireface400.gain(fromDB: -10)
+    st.ampGains["4"] = 26          // stale pre-fix (2x) encoding
+    st.ampGains["0"] = 20          // mic1 still replayed
+    var w: [(UInt32, UInt32)] = []
+    let c = FirefaceController(testing: st,
+                               sink: { a, v in w.append((a, v)); return true })
+    _ = c.applyAll()
+    let gains = w.filter { $0.0 == Fireface400.gainRegister }
+    let g4 = gains.last(where: { ($0.1 >> 16) == 4 })!
+    eq(g4.1 & 0xffff, 16, "applyAll re-derives out1 amp gain = 16")
+    eq(c.state.ampGains["4"], 16, "state.ampGains refreshed")
+    check(!gains.contains(where: { $0.1 == (4 << 16) | 26 }),
+          "stale raw amp gain never written")
+    let g0 = gains.last(where: { ($0.1 >> 16) == 0 })!
+    eq(g0.1 & 0xffff, 20, "mic1 amp gain still replayed")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

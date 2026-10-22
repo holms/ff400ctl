@@ -39,6 +39,10 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   visible "lag". Drag state is now view-local; hardware writes still
   stream via coalesced preview calls, and the model commits once on
   release. `MatrixView` is `Equatable` and skips unchanged re-renders
+- `applyAll` replayed stale `state.ampGains` entries raw — output gains
+  (indices 4–21) saved before the encoding fix re-corrupted the fader↔amp
+  mapping. Re-apply now goes through `setOutputFader` which re-derives
+  each output amp gain; only input gains 0–3 are replayed
 
 ### Added
 - **Detach** button: opens the mixer in a normal titled window that stays
