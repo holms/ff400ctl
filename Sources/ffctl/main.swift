@@ -29,6 +29,7 @@ func usage() -> Never {
       ffctl mute-all               zero every input -> output fader
       ffctl apply                  re-write entire saved mixer state
       ffctl state [--json]         print tracked mixer state summary
+      ffctl --version              print version
 
     Automation:
       ffctl save <name>            snapshot current mix state as a named preset
@@ -50,6 +51,11 @@ func onOff(_ s: String) -> Bool? { ["on": true, "off": false][s] }
 
 let args = CommandLine.arguments
 guard args.count > 1 else { usage() }
+
+if args[1] == "--version" || args[1] == "version" {
+    print("ffctl \(FFVersion.string)")
+    exit(0)
+}
 
 let ctl: FirefaceController
 do {

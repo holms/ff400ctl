@@ -430,6 +430,8 @@ struct ContentView: View {
             Spacer()
             Text("mixer RAM is volatile — re-apply after power cycle")
                 .font(.caption2).foregroundStyle(Theme.secondary)
+            Text("v\(FFVersion.string)")
+                .font(.caption2).foregroundStyle(Theme.secondary)
             if !detached {
                 Button("Quit") { NSApplication.shared.terminate(nil) }
             }

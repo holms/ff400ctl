@@ -566,5 +566,12 @@ do {
     eq(Fireface400.mainSliderPos(0), 0, "gain 0 -> pos 0")
     eq(Fireface400.mainSliderPos(Fireface400.gain(fromDB: 10)), 1, ">=+6dB -> pos 1")
 }
+
+// MARK: - Version
+
+do {
+    check(FFVersion.string.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression) != nil,
+          "FFVersion.string is semver")
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

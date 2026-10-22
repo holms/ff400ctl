@@ -1,10 +1,13 @@
 ENT  := Resources/entitlements.plist
 BIN  := .build/release
 APP  := FFTray.app
-VER  ?= 0.5.0
+VER  ?= $(shell sed -n 's/.*string = "\(.*\)".*/\1/p' Sources/FFCore/Version.swift)
 DMG  := ff400ctl-$(VER).dmg
 
-.PHONY: all cli app test install clean universal dmg
+.PHONY: all cli app test install clean universal dmg print-version
+
+print-version:
+	@echo $(VER)
 
 all: cli app
 
@@ -17,6 +20,8 @@ app:
 	mkdir -p $(APP)/Contents/MacOS
 	cp $(BIN)/FFTray $(APP)/Contents/MacOS/FFTray
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	plutil -replace CFBundleShortVersionString -string $(VER) $(APP)/Contents/Info.plist
+	plutil -replace CFBundleVersion -string $$(git rev-list --count HEAD) $(APP)/Contents/Info.plist
 	codesign -s - --force --entitlements $(ENT) $(APP)
 
 # Universal release build (x86_64 + arm64 via lipo; works with CLT only).
@@ -33,6 +38,8 @@ universal:
 	mkdir -p $(APP)/Contents/MacOS
 	cp .build/universal/FFTray $(APP)/Contents/MacOS/FFTray
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	plutil -replace CFBundleShortVersionString -string $(VER) $(APP)/Contents/Info.plist
+	plutil -replace CFBundleVersion -string $$(git rev-list --count HEAD) $(APP)/Contents/Info.plist
 	codesign -s - --force --entitlements $(ENT) .build/universal/ffctl
 	codesign -s - --force --entitlements $(ENT) $(APP)
 

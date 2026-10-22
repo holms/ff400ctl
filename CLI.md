@@ -129,6 +129,7 @@ first or they'll be overwritten.
 ```bash
 ffctl state                  # human summary of non-zero cells + amp gains
 ffctl state --json           # full tracked MixerState as JSON (pipe to jq)
+ffctl --version              # print version (no device connection needed)
 ```
 
 The state is *tracked software state* — the device can't be read back

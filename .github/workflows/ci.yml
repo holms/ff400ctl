@@ -43,13 +43,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Tag matches FFVersion
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "$(make -s print-version)" \
+            || { echo "tag/version mismatch: tag ${GITHUB_REF_NAME#v} vs FFVersion $(make -s print-version)"; exit 1; }
+
       - name: Build universal DMG
-        run: make dmg VER=${GITHUB_REF_NAME#v}
+        run: make dmg
 
       - name: Attach DMG to release (create if needed)
         run: |
-          gh release upload "$GITHUB_REF_NAME" "ff400ctl-${GITHUB_REF_NAME#v}.dmg" --clobber \
-            || gh release create "$GITHUB_REF_NAME" "ff400ctl-${GITHUB_REF_NAME#v}.dmg" \
+          DMG="ff400ctl-$(make -s print-version).dmg"
+          gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber \
+            || gh release create "$GITHUB_REF_NAME" "$DMG" \
                --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

@@ -5,6 +5,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- Single version source `FFVersion.string` — `ffctl --version` prints
+  it, the Makefile stamps it into FFTray's Info.plist and names the DMG,
+  and the release workflow fails on a tag/version mismatch
 - Apache-2.0 `LICENSE` and a License section in the README (matching
   ASFW; register-map/protocol facts credited to FFADO and Linux ALSA
   fireface)
