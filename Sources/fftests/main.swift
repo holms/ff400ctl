@@ -5,6 +5,13 @@ import Foundation
 var failures = 0
 var checks = 0
 
+// Keep all file I/O in a throwaway dir — the snapshot/save tests must never
+// touch the real ~/Library/Application Support/ff400ctl.
+let testStateDir = NSTemporaryDirectory()
+    + "ff400ctl-fftests-\(ProcessInfo.processInfo.processIdentifier)"
+setenv("FFCTL_STATE_DIR", testStateDir, 1)
+try? FileManager.default.createDirectory(atPath: testStateDir, withIntermediateDirectories: true)
+
 func check(_ cond: @autoclosure () -> Bool, _ name: String) {
     checks += 1
     if !cond() {
@@ -105,6 +112,11 @@ for i in 0..<18 {
 }
 check(defaultOK, "default state: pb 1:1 unity, inputs muted, outputs unity")
 eq(s.playback[1], 0, "off-diagonal playback muted")
+
+check(MixerState.storeURL.path.hasPrefix(testStateDir),
+      "FFCTL_STATE_DIR overrides storeURL")
+check(MixerState.snapshotsDir.path.hasPrefix(testStateDir),
+      "FFCTL_STATE_DIR overrides snapshotsDir")
 
 eq(MixerState.index(src: 0, dest: 0), 0, "idx(0,0)")
 eq(MixerState.index(src: 0, dest: 1), 1, "idx(0,1)")
@@ -592,4 +604,5 @@ do {
     check(!t.update(present: true), "repeated present: no edge")
 }
 print("\(checks - failures)/\(checks) checks passed")
+try? FileManager.default.removeItem(atPath: testStateDir)
 exit(failures == 0 ? 0 : 1)

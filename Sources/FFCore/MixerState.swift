@@ -75,10 +75,19 @@ public struct MixerState: Codable, Equatable {
 
     // MARK: - Persistence
 
-    public static var storeURL: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    /// Directory holding state.json and snapshots/. Overridable with the
+    /// FFCTL_STATE_DIR environment variable — used by the e2e tests and
+    /// handy for portable/experimental setups.
+    public static var stateDir: URL {
+        if let p = getenv("FFCTL_STATE_DIR"), p.pointee != 0 {
+            return URL(fileURLWithPath: String(cString: p), isDirectory: true)
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ff400ctl", isDirectory: true)
-        return dir.appendingPathComponent("state.json")
+    }
+
+    public static var storeURL: URL {
+        stateDir.appendingPathComponent("state.json")
     }
 
     /// Defensive: arrays must be the right size even if the file was
@@ -122,7 +131,7 @@ public struct MixerState: Codable, Equatable {
     // MARK: - Snapshots (named presets, TotalMix "workspace" style)
 
     public static var snapshotsDir: URL {
-        storeURL.deletingLastPathComponent().appendingPathComponent("snapshots", isDirectory: true)
+        stateDir.appendingPathComponent("snapshots", isDirectory: true)
     }
 
     public static func snapshotURL(name: String) -> URL {
