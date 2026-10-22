@@ -103,10 +103,10 @@ struct VFader: View {
             .frame(width: faderColW - 6, height: faderTravel)
 
             Text(title)
-                .font(.system(size: 8, design: .monospaced))
-                .foregroundStyle(Theme.secondary)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.text)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.8)
             EditableValue(text: format(live ?? value), width: faderColW - 2, onCommit: onText)
         }
         .frame(width: faderColW)
@@ -273,7 +273,7 @@ struct ContentView: View {
                 .padding(.bottom, 6)
             }
             Text("row 1-4 = front jacks · 5-8 = rear line · 9-10 = SPDIF · 11-18 = ADAT")
-                .font(.system(size: 8, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(Theme.secondary.opacity(0.7))
         }
     }
@@ -353,7 +353,7 @@ struct ContentView: View {
                 .padding(.bottom, 6)
             }
             Text("1-6 = analog · 7-8 = phones · 9-10 = SPDIF · 11-18 = ADAT · ST links a pair into one fader")
-                .font(.system(size: 8, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(Theme.secondary.opacity(0.7))
         }
     }
@@ -501,12 +501,12 @@ private struct MatrixView: View, Equatable {
         HStack(alignment: .top, spacing: gap) {
             VStack(alignment: .leading, spacing: gap) {
                 Text("IN \\ OUT")
-                    .font(.system(size: 8, design: .monospaced))
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(Theme.secondary)
                     .frame(width: labelWidth, height: 14, alignment: .leading)
                 ForEach(0..<n, id: \.self) { src in
                     Text(rowNames[src])
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Theme.secondary)
                         .frame(width: labelWidth, height: cellH, alignment: .leading)
                 }
@@ -515,7 +515,7 @@ private struct MatrixView: View, Equatable {
                 HStack(spacing: gap) {
                     ForEach(0..<n, id: \.self) { d in
                         Text("\(d + 1)")
-                            .font(.system(size: 8, design: .monospaced))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Theme.secondary)
                             .frame(width: cellSize, height: 14)
                     }

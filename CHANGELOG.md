@@ -12,6 +12,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   hotkey scripts)
 
 ### Fixed
+- Unreadable channel labels: fader titles 8pt (scaled down to ~5pt) →
+  12pt semibold; matrix row names 9 → 11pt, column numbers 8 → 11pt;
+  strip hint lines 8 → 10pt
 - Input/output strips showed no scroll affordance and the last fader was
   visibly clipped at the panel edge — scrollbars are now shown, the last
   column gets trailing padding, and the detached window is resizable so
