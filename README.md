@@ -33,6 +33,30 @@ TotalMix/FFADO use, through ASFW's raw `AsyncWrite` user-client method.
 - RME Fireface 400 on the bus.
 - **No Xcode required** — Command Line Tools (`swift`) is enough.
 
+## Install
+
+Grab `ff400ctl-<ver>.dmg` from Releases, drag **FFTray.app** to
+Applications, and optionally `sudo cp ffctl /usr/local/bin/`.
+
+**Gatekeeper:** the binaries aren't notarized, so first launch is
+blocked. Right-click FFTray.app → **Open**, or approve it in System
+Settings → Privacy & Security → **Open Anyway**, or clear quarantine:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/FFTray.app
+xattr -d com.apple.quarantine /usr/local/bin/ffctl   # if you installed the CLI
+```
+
+**Entitlement caveat:** the binaries are ad-hoc signed and claim
+`com.apple.developer.driverkit.userclient-access` for `net.asfw.driver`.
+Verified working on the author's Mac (custom SIP configuration, OpenCore
+Legacy Patcher); on a stock-security Mac, macOS may refuse to launch a
+binary claiming that restricted entitlement without a provisioning
+profile — untested, reports welcome. The planned fix is ASFW's driver
+extension adopting
+`com.apple.developer.driverkit.allow-any-userclient-access`, after which
+no entitlement is needed client-side.
+
 ## Build
 
 ```sh

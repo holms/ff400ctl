@@ -56,8 +56,19 @@ dmg: universal
 		"ff400ctl $(VER) — install" "" \
 		"1. Drag FFTray.app onto the Applications shortcut (menu-bar mixer UI)." \
 		"2. For the command-line tool:  sudo cp ffctl /usr/local/bin/" "" \
-		"Both binaries are ad-hoc signed with the net.asfw.driver userclient" \
-		"entitlement, so they can talk to the ASFW driver. Docs: README.md, CLI.md." \
+		"First launch: the app isn't notarized, so Gatekeeper blocks it." \
+		"Right-click FFTray.app -> Open, or approve via System Settings ->" \
+		"Privacy & Security -> Open Anyway, or clear quarantine:" \
+		"    xattr -dr com.apple.quarantine /Applications/FFTray.app" \
+		"    xattr -d com.apple.quarantine /usr/local/bin/ffctl" "" \
+		"Both binaries are ad-hoc signed and claim" \
+		"com.apple.developer.driverkit.userclient-access for net.asfw.driver." \
+		"Verified on the author's Mac (custom SIP config, OCLP); on a" \
+		"stock-security Mac macOS may refuse to run a binary claiming that" \
+		"restricted entitlement without a provisioning profile — untested," \
+		"reports welcome. Planned fix: ASFW adopting" \
+		"com.apple.developer.driverkit.allow-any-userclient-access." \
+		"Docs: README.md, CLI.md." \
 		> .build/dmg/INSTALL.txt
 	hdiutil create -volname "ff400ctl $(VER)" -srcfolder .build/dmg -ov -format UDZO $(DMG)
 

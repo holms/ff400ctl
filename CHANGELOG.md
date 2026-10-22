@@ -5,6 +5,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- Install docs (README "Install" + DMG INSTALL.txt): Gatekeeper bypass
+  steps for the unnotarized build and the restricted-entitlement caveat
+  on stock-security Macs
 - Auto re-apply: FFTray watches the CoreAudio device list and re-pushes
   the saved mix when the FF400 reappears after a power cycle (footer
   toggle "Auto re-apply", on by default; new `DevicePresence` in FFCore)
