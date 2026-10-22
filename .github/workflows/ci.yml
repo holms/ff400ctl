@@ -9,12 +9,14 @@ on:
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
   build-test:

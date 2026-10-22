@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: ASFW driver bugs
+    url: https://github.com/mrmidi/ASFireWire/issues
+    about: Audio dropouts, driver loading, device not appearing — those belong to the ASFireWire driver project, not ff400ctl.

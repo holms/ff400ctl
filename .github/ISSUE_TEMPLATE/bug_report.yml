@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in ff400ctl / FFTray isn't working
+labels: [bug]
+body:
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: e.g. macOS 15.1 (sw_vers)
+    validations:
+      required: true
+  - type: input
+    id: mac-model
+    attributes:
+      label: Mac model
+      description: Intel or Apple Silicon — e.g. MacPro6,1
+    validations:
+      required: true
+  - type: dropdown
+    id: sip
+    attributes:
+      label: SIP / OCLP status
+      options:
+        - Stock (full security)
+        - Custom SIP / OpenCore Legacy Patcher
+        - Unknown
+    validations:
+      required: true
+  - type: input
+    id: asfw
+    attributes:
+      label: ASFW version
+      description: Output of `systemextensionsctl list | grep -i asfw`
+    validations:
+      required: true
+  - type: input
+    id: ff400ctl
+    attributes:
+      label: ff400ctl version
+      description: Output of `ffctl --version`
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected vs what you saw
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Tray logs: `log show --last 5m --predicate 'subsystem == "net.holms.fftray"'`
+      render: shell

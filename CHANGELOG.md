@@ -5,6 +5,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- GitHub issue templates (bug report / feature request) and
+  CONTRIBUTING.md
 - Install docs (README "Install" + DMG INSTALL.txt): Gatekeeper bypass
   steps for the unnotarized build and the restricted-entitlement caveat
   on stock-security Macs
