@@ -5,6 +5,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- Apache-2.0 `LICENSE` and a License section in the README (matching
+  ASFW; register-map/protocol facts credited to FFADO and Linux ALSA
+  fireface)
 - **MAIN volume row** in FFTray — one slider + mute for a stereo output
   pair (pair picker, -60…+6 dB linear travel, bottom = mute); new
   `setPairFader`/`setPairMute` in FFCore, `ffctl main <g> [pair]` and

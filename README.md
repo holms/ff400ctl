@@ -177,3 +177,9 @@ always restores the stored configuration.
 - Protocol: [FFADO project](https://ffado.org) `src/rme/` (J. Woithe et al.)
 - Driver path: [ASFireWire](https://github.com/mrmidi/ASFireWire) by mrmidi
 - UI style: ASFW Audio Analyzer "Studio Dark" theme
+
+## License
+
+Apache-2.0, matching ASFW. Register map and protocol details were derived
+from FFADO and the Linux ALSA fireface driver (hardware facts; no code
+copied).
