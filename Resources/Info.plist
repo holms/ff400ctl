@@ -10,6 +10,8 @@
     <string>Fireface 400 Tray</string>
     <key>CFBundleExecutable</key>
     <string>FFTray</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

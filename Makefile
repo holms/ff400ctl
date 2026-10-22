@@ -20,6 +20,7 @@ app:
 	mkdir -p $(APP)/Contents/MacOS
 	cp $(BIN)/FFTray $(APP)/Contents/MacOS/FFTray
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	mkdir -p $(APP)/Contents/Resources && cp Resources/AppIcon.icns $(APP)/Contents/Resources/
 	plutil -replace CFBundleShortVersionString -string $(VER) $(APP)/Contents/Info.plist
 	plutil -replace CFBundleVersion -string $$(git rev-list --count HEAD) $(APP)/Contents/Info.plist
 	codesign -s - --force --entitlements $(ENT) $(APP)
@@ -38,6 +39,7 @@ universal:
 	mkdir -p $(APP)/Contents/MacOS
 	cp .build/universal/FFTray $(APP)/Contents/MacOS/FFTray
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	mkdir -p $(APP)/Contents/Resources && cp Resources/AppIcon.icns $(APP)/Contents/Resources/
 	plutil -replace CFBundleShortVersionString -string $(VER) $(APP)/Contents/Info.plist
 	plutil -replace CFBundleVersion -string $$(git rev-list --count HEAD) $(APP)/Contents/Info.plist
 	codesign -s - --force --entitlements $(ENT) .build/universal/ffctl
