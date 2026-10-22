@@ -344,5 +344,24 @@ do {
     wq4.waitUntilIdle()
     check(true, "waitUntilIdle on empty queue returns")
 }
+// MARK: - ampGainDB inverse
+
+do {
+    eq(Fireface400.ampGainDB(index: 0, devval: 20), 20, "mic 20dB inverse")
+    eq(Fireface400.ampGainDB(index: 2, devval: 21), 10.5, "in3 0.5dB units inverse")
+    eq(Fireface400.ampGainDB(index: 4, devval: 16), -10, "out -10dB inverse")
+    eq(Fireface400.ampGainDB(index: 4, devval: 0x3f), -.infinity, "out mute inverse")
+    check(Fireface400.ampGainDB(index: 22, devval: 0) == nil, "ampGainDB bad index -> nil")
+    // round-trips
+    if let rv = Fireface400.ampGainValue(index: 0, dB: 20) {
+        eq(Fireface400.ampGainDB(index: 0, devval: rv & 0xffff), 20, "mic round-trip")
+    }
+    if let rv = Fireface400.ampGainValue(index: 2, dB: 10.5) {
+        eq(Fireface400.ampGainDB(index: 2, devval: rv & 0xffff), 10.5, "in3 round-trip")
+    }
+    if let rv = Fireface400.ampGainValue(index: 4, dB: -10) {
+        eq(Fireface400.ampGainDB(index: 4, devval: rv & 0xffff), -10, "out round-trip")
+    }
+}
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

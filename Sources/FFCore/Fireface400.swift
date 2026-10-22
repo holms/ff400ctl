@@ -126,6 +126,20 @@ public enum Fireface400 {
         return UInt32(index << 16) | (devval & 0xffff)
     }
 
+    /// Inverse of `ampGainValue`: recover dB from a stored devval.
+    /// mic → whole dB; inputs 3/4 → 0.5 dB units; outputs → 6 - devval
+    /// (0x3f = -inf/mute). Returns nil for an out-of-range index.
+    public static func ampGainDB(index: Int, devval: UInt32) -> Double? {
+        guard (0..<22).contains(index) else { return nil }
+        if index <= AmpGain.mic2.rawValue {
+            return Double(devval)
+        } else if index <= AmpGain.input4.rawValue {
+            return Double(devval) / 2
+        } else {
+            return devval == 0x3f ? -.infinity : 6 - Double(devval)
+        }
+    }
+
     // MARK: - Channel names
 
     public static let inputNames: [String] = [

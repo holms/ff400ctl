@@ -13,6 +13,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   keys are now per-flag / per-channel
 - Output amp-gain encoding was 2× the fader dB — now `devval = 6 - round(dB)`
   (whole dB), matching FFADO's `set_hardware_ampgain`
+- Tray preamp sliders showed 0 dB regardless of hardware state; they're
+  now initialized from tracked amp gains via the new `ampGainDB` inverse
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)

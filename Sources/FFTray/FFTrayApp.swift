@@ -67,6 +67,10 @@ final class MixerModel: ObservableObject {
             outputMute = c.state.outputMute
             monoBus = c.state.monoBus
             outputStereo = c.state.outputStereo
+            micGain = [Fireface400.ampGainDB(index: 0, devval: c.state.ampGains["0"] ?? 0) ?? 0,
+                       Fireface400.ampGainDB(index: 1, devval: c.state.ampGains["1"] ?? 0) ?? 0]
+            inGain = [Fireface400.ampGainDB(index: 2, devval: c.state.ampGains["2"] ?? 0) ?? 0,
+                      Fireface400.ampGainDB(index: 3, devval: c.state.ampGains["3"] ?? 0) ?? 0]
         } catch {
             lastError = "\(error)"
         }
