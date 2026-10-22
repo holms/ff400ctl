@@ -26,6 +26,8 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   `MixerState.normalized()` pads/truncates all arrays in both loaders
 - UI changes while the driver was disconnected failed silently; they now
   surface "not connected — change not applied"
+- `ASFWClient` leaked a mach receive port and a shared-memory mapping per
+  connection; both are released in `deinit`
 
 ### Changed
 - `WriteCoalescer` is now public in FFCore (`Sources/FFCore/WriteCoalescer.swift`)

@@ -35,6 +35,10 @@ public final class ASFWClient {
 
     /// One entry per successfully opened ASFWDriver service.
     private var connections: [io_connect_t] = []
+    /// Status-listener mach ports created by `handshake`, per connection.
+    private var listenerPorts: [mach_port_t] = []
+    /// Shared-memory mappings created by `handshake`, per connection.
+    private var mappings: [(conn: io_connect_t, addr: mach_vm_address_t)] = []
 
     public var connectionCount: Int { connections.count }
 
@@ -58,6 +62,13 @@ public final class ASFWClient {
     }
 
     deinit {
+        for m in mappings {
+            _ = IOConnectUnmapMemory64(m.conn, 0, mach_task_self_, m.addr)
+        }
+        for port in listenerPorts {
+            mach_port_mod_refs(mach_task_self_, port,
+                               mach_port_right_t(MACH_PORT_RIGHT_RECEIVE), -1)
+        }
         for conn in connections { IOServiceClose(conn) }
     }
 
@@ -66,11 +77,16 @@ public final class ASFWClient {
     private func handshake(_ conn: io_connect_t) {
         var addr: mach_vm_address_t = 0
         var size: mach_vm_size_t = 0
-        _ = IOConnectMapMemory64(conn, 0, mach_task_self_, &addr, &size,
-                                 UInt32(kIOMapAnywhere | kIOMapDefaultCache))
+        if IOConnectMapMemory64(conn, 0, mach_task_self_, &addr, &size,
+                                UInt32(kIOMapAnywhere | kIOMapDefaultCache)) == KERN_SUCCESS,
+           addr != 0 {
+            mappings.append((conn, addr))
+        }
 
         var port: mach_port_t = 0
-        mach_port_allocate(mach_task_self_, MACH_PORT_RIGHT_RECEIVE, &port)
+        guard mach_port_allocate(mach_task_self_, MACH_PORT_RIGHT_RECEIVE, &port)
+                == KERN_SUCCESS else { return }
+        listenerPorts.append(port)
         mach_port_insert_right(mach_task_self_, port, port,
                                mach_msg_type_name_t(MACH_MSG_TYPE_MAKE_SEND))
         var ref: UInt64 = 0
