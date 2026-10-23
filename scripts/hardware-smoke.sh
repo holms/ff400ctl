@@ -64,14 +64,17 @@ fi
 # 3. Burst check: write each input's tracked out0 cell back, 8 cells
 #    back-to-back — catches intermittent transaction drops under small
 #    bursts without changing the tracked mix.
-BURST_OK=1
+BURST_LINES=""
 for src in 0 1 2 3 4 5 6 7; do
     V=$(echo "$OUT" | python3 -c "import json,sys; print(json.load(sys.stdin)['input'][$src*18])" 2>/dev/null)
     [ -z "$V" ] && V=0
-    "$BIN" mix "$src" 0 "$V" >/dev/null 2>&1 || { BURST_OK=0; break; }
+    BURST_LINES+="mix $src 0 $V"$'\n'
 done
-[ "$BURST_OK" = "1" ] && ok "8 back-to-back writes completed" \
-                      || bad "write failed during the 8-cell burst"
+if printf '%s' "$BURST_LINES" | "$BIN" batch - >/dev/null 2>&1; then
+    ok "8 back-to-back writes completed"
+else
+    bad "write failed during the 8-cell burst"
+fi
 
 # 4. Optional full apply — ~700 transactions in a burst; earlier bursts
 #    froze the FF400, so this is opt-in.
