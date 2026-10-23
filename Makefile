@@ -84,6 +84,7 @@ e2e:
 # The user-client access entitlement is required even for ad-hoc debug.
 hwtest:
 	swift build --product ffctl
+	swift build --product ffmeter
 	codesign -s - --force --entitlements $(ENT) .build/debug/ffctl
 	bash scripts/hardware-smoke.sh
 
