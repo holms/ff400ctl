@@ -18,6 +18,10 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   fake device (`FFCTL_FAKE_HW`/`FFCTL_STATE_DIR`/`FFCTL_FAKE_FAIL` env
   vars — also a usable dry-run mode) in CI; `make hwtest` runs an
   opt-in hardware smoke test (connect + completed write transaction)
+- `ffmeter` level-capture tool + `HWTEST_LEVEL=1` hwtest scenario:
+  records the FF400's input while a tone loops through the speakers and
+  verifies mute/fader/preamp changes in the measured level (proves the
+  device applied the change, which write-status alone can't)
 - hwtest: 8-cell back-to-back write burst (catches intermittent
   transaction drops); `HWTEST_AUDIO=1` runs an interactive 440 Hz tone
   mute/unmute check on pair `HWTEST_PAIR` (default AN1/2)
