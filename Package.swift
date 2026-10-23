@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "FFModel", targets: ["FFModel"]),
         .executable(name: "ffctl", targets: ["ffctl"]),
         .executable(name: "FFTray", targets: ["FFTray"]),
+        .executable(name: "ffmeter", targets: ["ffmeter"]),
     ],
     targets: [
         .target(name: "FFCore", dependencies: []),
@@ -23,5 +24,8 @@ let package = Package(
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
         .executableTarget(name: "fftests", dependencies: ["FFCore", "FFModel"]),
+        // Level-meter capture tool for the hardware test (not shipped
+        // in the DMG).
+        .executableTarget(name: "ffmeter", dependencies: ["FFCore"]),
     ]
 )

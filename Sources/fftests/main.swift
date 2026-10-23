@@ -862,6 +862,35 @@ do {
     check(t.update(present: true), "absent->present edge fires")
     check(!t.update(present: true), "repeated present: no edge")
 }
+// MARK: - LevelMeter
+
+do {
+    // 1 kHz sine at amplitude 0.1, 10 whole cycles at 48 kHz — the peak
+    // sample lands exactly on sin(pi/2) = 1.
+    var sine = [Float](repeating: 0, count: 480)
+    for i in 0..<480 { sine[i] = 0.1 * Float(sin(2 * .pi * Double(i) * 1000.0 / 48000.0)) }
+    let s = sine.withUnsafeBufferPointer { LevelMeter.measure($0) }
+    close(s.rmsDB, 20 * log10(0.1 / sqrt(2)), 0.05, "sine 0.1 rms ~ -23.01")
+    close(s.peakDB, -20.0, 0.05, "sine 0.1 peak = -20")
+
+    var dc = [Float](repeating: 0.5, count: 256)
+    let d = dc.withUnsafeBufferPointer { LevelMeter.measure($0) }
+    close(d.rmsDB, 20 * log10(0.5), 0.01, "dc 0.5 rms = -6.02")
+    close(d.peakDB, 20 * log10(0.5), 0.01, "dc 0.5 peak = -6.02")
+
+    var zeros = [Float](repeating: 0, count: 100)
+    let z = zeros.withUnsafeBufferPointer { LevelMeter.measure($0) }
+    eq(z.rmsDB, -200.0, "silence rms = -200")
+    eq(z.peakDB, -200.0, "silence peak = -200")
+
+    var acc = LevelMeter.Accumulator()
+    var chunkA = Array(sine[0..<240])
+    var chunkB = Array(sine[240..<480])
+    chunkA.withUnsafeBufferPointer { acc.add($0) }
+    chunkB.withUnsafeBufferPointer { acc.add($0) }
+    close(acc.rmsDB, s.rmsDB, 0.001, "accumulator rms == single-pass")
+    close(acc.peakDB, s.peakDB, 0.001, "accumulator peak == single-pass")
+}
 print("\(checks - failures)/\(checks) checks passed")
 try? FileManager.default.removeItem(atPath: testStateDir)
 exit(failures == 0 ? 0 : 1)
