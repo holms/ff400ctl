@@ -27,6 +27,12 @@ so the mix only changes if the device's RAM drifted. Options:
 - `HWTEST_AUDIO=1` — interactive: plays a 440 Hz tone through the FF400
   and asks you to confirm mute/unmute actually worked
 - `HWTEST_PAIR=n` — output pair for the audio test (default 0 = AN1/2)
+- `HWTEST_LEVEL=1` — measured check: records the FF400's own input with
+  `ffmeter` while a tone loops through the AN1/2 speakers, and verifies
+  mute/fader/preamp changes in the captured level. Needs a mic on input
+  `HWTEST_LEVEL_CH` (default 1) that can hear the speakers; the mic's
+  monitoring is muted during the test (no acoustic feedback) and all
+  faders/mutes/gains are restored afterwards.
 
 ## House rules
 
