@@ -1,7 +1,7 @@
 import Foundation
 import FFCore
 
-func usage() -> Never {
+func usage(_ code: Int32 = 2) -> Never {
     print("""
     ffctl — RME Fireface 400 mixer control via the ASFW user client
 
@@ -43,14 +43,18 @@ func usage() -> Never {
     Gain arguments accept: 0x8000, decimal, dB like "-6dB", or a relative
     step like "+3dB"/"-3dB" (applied to the tracked value — handy for
     hotkey-driven volume scripts).
+
+    Exit codes: 0 success, 1 command/hardware failure, 2 invalid arguments.
     """)
-    exit(0)
+    exit(code)
 }
 
 func onOff(_ s: String) -> Bool? { ["on": true, "off": false][s] }
 
 let args = CommandLine.arguments
-guard args.count > 1 else { usage() }
+guard args.count > 1 else { usage(0) }
+
+if args[1] == "--help" || args[1] == "-h" || args[1] == "help" { usage(0) }
 
 if args[1] == "--version" || args[1] == "version" {
     print("ffctl \(FFVersion.string)")

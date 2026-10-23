@@ -4,6 +4,11 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Fixed
+- `ffctl` exited 0 on invalid arguments — usage now exits 2 (still 0 for
+  bare `ffctl`, `--help`, `-h`, `help`); `1` remains command/hardware
+  failure
+
 ### Added
 - End-to-end tests: `make e2e` drives the real `ffctl` binary against a
   fake device (`FFCTL_FAKE_HW`/`FFCTL_STATE_DIR`/`FFCTL_FAKE_FAIL` env

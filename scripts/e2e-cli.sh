@@ -162,11 +162,24 @@ OUT=$(FFCTL_FAKE_FAIL=1 "$BIN" apply 2>&1); RC=$?
 expect_rc 1 "failing device: apply nonzero"
 expect_out "failed" "failing device: reports failure"
 
-# invalid args -> usage text
+# invalid args -> usage text + exit 2
 run main -3dB 9
+expect_rc 2 "invalid pair exits 2"
 expect_out "ffctl — RME Fireface 400" "invalid pair shows usage"
 run mix 0
+expect_rc 2 "missing args exits 2"
 expect_out "ffctl — RME Fireface 400" "missing args shows usage"
+run bogus
+expect_rc 2 "unknown command exits 2"
+expect_out "ffctl — RME Fireface 400" "unknown command shows usage"
+
+# no args / --help -> usage text + exit 0
+OUT=$("$BIN" 2>&1); RC=$?
+expect_rc 0 "no args exits 0"
+echo "$OUT" | grep -qF "ffctl — RME Fireface 400" && ok || bad "no args shows usage"
+run --help
+expect_rc 0 "--help exits 0"
+expect_out "ffctl — RME Fireface 400" "--help shows usage"
 
 echo
 echo "== $pass passed, $fail failed"

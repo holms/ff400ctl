@@ -15,7 +15,8 @@ user client — no TotalMix or legacy RME driver required.
 Every command opens a user-client connection, applies the change, and
 saves the tracked mixer state to
 `~/Library/Application Support/ff400ctl/state.json` before exiting.
-Exit code is `0` on success, `1` on failure — safe for scripting.
+Exit codes: `0` = success, `1` = command or hardware failure,
+`2` = invalid arguments (usage is printed) — safe for scripting.
 
 ## Dry-run / testing environment variables
 
