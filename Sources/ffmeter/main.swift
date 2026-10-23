@@ -10,9 +10,12 @@ import FFCore
 //
 //   ffmeter [seconds=1.5] [channels=1,2]     (channels are 1-based)
 //
-// SAFETY: only run this while a playback stream is active on the FF400
-// (e.g. afplay <file> &). A capture started with no playback running
-// has been observed to leave the unit in a stuck state.
+// SAFETY: ASFW can intermittently stall the FireWire controller's
+// interrupt delivery right after a stream STOPS ([IrqStall] in the
+// driver log; recover by restarting the controller / replugging the
+// adapter). Callers should keep one playback stream running across
+// consecutive measurements so a test causes as few stream stops as
+// possible.
 //
 // Errors (no device / start failure / 0 frames) go to stderr, exit 1.
 

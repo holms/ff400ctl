@@ -188,11 +188,6 @@ s.writeframes(bytes(48000 * 8 * 4))   # 8 s of silence — keeps a stream up
 s.close()
 EOF
 
-            # FEEDBACK SAFETY: the mic must not be monitored through the
-            # speakers while it records them — mute its input row first.
-            # (Recording is pre-mixer; capture is unaffected.)
-            "$BIN" mute "$IN_IDX" on >/dev/null 2>&1
-
             TONE_PID=""; SIL_PID=""; RESTORED=0
             restore() {
                 [ "$RESTORED" = "1" ] && return; RESTORED=1
@@ -208,19 +203,29 @@ EOF
             }
             trap restore EXIT INT TERM
 
+            # FEEDBACK SAFETY: the mic must not be monitored through the
+            # speakers while it records them — mute its input row first.
+            # (Recording is pre-mixer; capture is unaffected.)
+            "$BIN" mute "$IN_IDX" on >/dev/null 2>&1
+
             # "rms peak" of the mic channel over 1.5 s of capture.
             meas() { "$METER" 1.5 "$LCH" | python3 -c \
                 'import json,sys; c=json.load(sys.stdin)["channels"][0]; print(c["rms_db"], c["peak_db"])'; }
 
-            # Noise floor — a playback stream must be running before any
-            # capture starts (the device has wedged after a capture made
-            # with nothing playing).
+            # Noise floor — keep one playback stream alive across the
+            # whole test: ASFW can intermittently stall the FireWire
+            # controller's interrupt delivery right after a stream STOPS
+            # ([IrqStall] in the driver log; recover by replugging), so
+            # the only stream stop here is the final one in restore.
             afplay "$SIL" & SIL_PID=$!
             sleep 2
             N=$(meas); echo "   noise floor  N  = $N"
-            kill "$SIL_PID" 2>/dev/null; SIL_PID=""
 
+            # Overlap: start the tone while the silence still plays,
+            # then stop the silence — no stream gap.
             afplay "$TONE" & TONE_PID=$!
+            sleep 1
+            kill "$SIL_PID" 2>/dev/null; SIL_PID=""
             sleep 1.5
             T=$(meas); echo "   tone level   T  = $T"
             T_RMS=$(echo "$T" | awk '{print $1}')
