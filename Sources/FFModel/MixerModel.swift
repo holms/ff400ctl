@@ -46,8 +46,13 @@ public final class MixerModel: NSObject, ObservableObject {
         didSet { UserDefaults.standard.set(autoReapply, forKey: "autoReapply") }
     }
 
+    /// Read and reassigned ONLY on the hw queue (init/adopt run before
+    /// any queue use); main-thread code must gate on `connected`.
     var ctl: FirefaceController?
     let hwq = WriteCoalescer()
+    /// How to (re)connect — injectable so tests can swap in a fake sink.
+    public var makeController: (MixerState) throws -> FirefaceController =
+        { try FirefaceController(state: $0) }
     /// Watches the state.json directory for writes by ffctl.
     private var stateWatcher: DirectoryWatcher?
     /// State at our own most recent save. Touched ONLY on the hw queue —
@@ -111,11 +116,39 @@ public final class MixerModel: NSObject, ObservableObject {
         hwq.waitUntilIdle()
     }
 
-    /// Re-apply the tracked mix — called by the app's presence watcher
-    /// when the FF400 reappears after a power cycle.
+    /// Reconnect and re-apply the tracked mix — called by the app's
+    /// presence watcher when the FF400 reappears after a power cycle or
+    /// a FireWire controller restart. A replug can tear down and
+    /// recreate the ASFW driver instance, leaving our user client bound
+    /// to a dead instance whose writes silently fail, so we rebuild the
+    /// connection (releasing the old controller + ASFWClient) before
+    /// pushing the state.
     public func deviceReappeared() {
-        applyAll()
-        modelLog.notice("FF400 reappeared — re-applied mix")
+        let pair = busPairs[monitorBus]   // read on main before submitting
+        hwq.submit("reconnect") { [weak self] in
+            guard let self else { return }
+            let state = self.ctl?.state ?? MixerState.load()
+            let busPair = self.ctl?.busPair ?? (pair.a, pair.b)
+            do {
+                let c = try self.makeController(state)
+                c.busPair = busPair
+                self.ctl = c   // releasing the old ctl closes its dead clients
+                let r = c.applyAll()
+                c.saveState(); self.lastSaved = c.state
+                modelLog.notice("FF400 reappeared — reconnected, re-applied mix: \(r.written) writes, \(r.failed) failed")
+                DispatchQueue.main.async {
+                    self.connected = true
+                    self.lastError = r.failed == 0 ? nil
+                        : "\(r.failed) writes failed after reconnect"
+                    self.publish(c.state)
+                }
+            } catch {
+                modelLog.error("reconnect failed: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.lastError = "reconnect failed: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     /// Drain pending hw-queue work (tests + shutdown).
@@ -173,7 +206,7 @@ public final class MixerModel: NSObject, ObservableObject {
     /// auto-saved (coalesced) after each change.
     func hw(_ key: String, _ failMsg: String = "write failed",
             _ work: @escaping (FirefaceController) -> Bool) {
-        guard ctl != nil else {
+        guard connected else {
             lastError = "not connected — change not applied"
             return
         }

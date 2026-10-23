@@ -736,6 +736,57 @@ do {
        "disconnected model reports error")
 }
 
+// MARK: - MixerModel reconnect on deviceReappeared
+
+do {
+    func pump(_ s: Double = 0.1) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+
+    // reconnect routes the re-apply to the NEW controller; tracked
+    // state and the monitor bus pair carry over
+    var wa: [(UInt32, UInt32)] = []
+    var wb: [(UInt32, UInt32)] = []
+    let sinkA: (UInt32, UInt32) -> Bool = { a, v in wa.append((a, v)); return true }
+    let sinkB: (UInt32, UInt32) -> Bool = { a, v in wb.append((a, v)); return true }
+    var ctlB: FirefaceController!
+    let m = MixerModel(testing: FirefaceController(testing: MixerState(), sink: sinkA))
+    m.monitorBus = 1; m.syncBusPair(); m.flush()
+    m.setOutput(0, gain: 0x2000); m.flush()
+    m.makeController = { s in
+        let c = FirefaceController(testing: s, sink: sinkB)
+        ctlB = c
+        return c
+    }
+    wa.removeAll()
+    m.deviceReappeared(); m.flush(); pump()
+    check(wa.isEmpty, "reconnect writes nothing to the dead controller")
+    check(wb.count >= 600, "reconnect re-applied full state — got \(wb.count)")
+    eq(wb.last(where: { $0.0 == 0x8008_0f80 })?.1 ?? 0, 0x2000,
+       "reconnect carries tracked output fader")
+    check(ctlB.busPair == (2, 3), "reconnect carries monitor bus pair")
+    check(m.connected, "connected after reconnect")
+
+    // a throwing makeController keeps the old controller alive
+    var wa2: [(UInt32, UInt32)] = []
+    let sinkA2: (UInt32, UInt32) -> Bool = { a, v in wa2.append((a, v)); return true }
+    let m2 = MixerModel(testing: FirefaceController(testing: MixerState(), sink: sinkA2))
+    m2.makeController = { _ in throw NSError(domain: "test", code: 1) }
+    m2.deviceReappeared(); m2.flush(); pump()
+    check(m2.lastError?.hasPrefix("reconnect failed") == true,
+          "reconnect failure reported")
+    m2.setOutput(1, gain: 0x1111); m2.flush()
+    eq(wa2.last(where: { $0.0 == 0x8008_0f84 })?.1 ?? 0, 0x1111,
+       "old controller still used after failed reconnect")
+
+    // launched disconnected: the first reappearance connects
+    var wb2: [(UInt32, UInt32)] = []
+    let sinkB2: (UInt32, UInt32) -> Bool = { a, v in wb2.append((a, v)); return true }
+    let m3 = MixerModel(testing: nil)
+    m3.makeController = { s in FirefaceController(testing: s, sink: sinkB2) }
+    m3.deviceReappeared(); m3.flush(); pump()
+    check(m3.connected, "disconnected model connects on reappear")
+    check(!wb2.isEmpty, "new controller received the apply")
+}
+
 // MARK: - ExternalStateWatcher.shouldAdopt (reload rule)
 
 do {

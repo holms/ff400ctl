@@ -5,6 +5,10 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Fixed
+- Auto re-apply after a FireWire controller restart (e.g. adapter
+  replug) wrote into a dead driver connection; FFTray now reconnects
+  before re-applying, and also reconnects when it launched while the
+  FF400 was unavailable
 - `ffctl` exited 0 on invalid arguments — usage now exits 2 (still 0 for
   bare `ffctl`, `--help`, `-h`, `help`); `1` remains command/hardware
   failure
