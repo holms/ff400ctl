@@ -891,6 +891,46 @@ do {
     close(acc.rmsDB, s.rmsDB, 0.001, "accumulator rms == single-pass")
     close(acc.peakDB, s.peakDB, 0.001, "accumulator peak == single-pass")
 }
+// MARK: - HardwareMeters (block @0x80100000 parse + readMeters sink)
+
+do {
+    // Build a fake 648-byte block: region 3 (offset 432) = phys-in,
+    // stream-in, phys-out, 18 LE quadlets each.
+    var block = Data(count: HardwareMeters.blockSize)
+    func put(_ g: Int, _ ch: Int, _ raw: UInt32) {
+        let p = 432 + (g * 18 + ch) * 4
+        block[p] = UInt8(raw & 0xff); block[p+1] = UInt8(raw >> 8 & 0xff)
+        block[p+2] = UInt8(raw >> 16 & 0xff); block[p+3] = UInt8(raw >> 24)
+    }
+    put(0, 0, 0x7fffff00)  // phys-in 0: 0 dB
+    put(0, 1, 0x3fff8000 | 0x01)  // phys-in 1: ~half amplitude (-6 dB) + clip
+    put(1, 5, 0x40000000)  // stream-in 5: ~half amplitude (-6 dB)
+    put(2, 17, 0x7fffff00) // phys-out 17: 0 dB
+    put(0, 2, 0x100)       // phys-in 2: below floor -> clamps to -90.03
+    let m = HardwareMeters.parse(block)!
+
+    eq(HardwareMeters.parse(Data(count: 100)), nil, "short block rejected")
+    close(m.physIn[0], 0.0, 0.01, "phys-in 0 full scale = 0 dB")
+    close(m.physIn[1], -6.02, 0.05, "phys-in 1 half amplitude = -6.02 dB")
+    eq(m.physInClip[0], false, "phys-in 0 not clipping")
+    eq(m.physInClip[1], true, "phys-in 1 clip flag from low byte")
+    close(m.streamIn[5], -6.02, 0.05, "stream-in 5 parses")
+    eq(m.physOut[17], 0.0, "phys-out 17 full scale")
+    eq(m.physOut[0], -.infinity, "zero quadlet = -inf (silence)")
+    eq(m.physIn[2], -90.03, "below-floor raw clamps to -90.03")
+    eq(m.physIn.count, 18, "18 phys inputs")
+    eq(m.streamIn.count, 18, "18 stream inputs")
+    eq(m.physOut.count, 18, "18 phys outputs")
+
+    // readMeters via injected block sink
+    let ctl2 = FirefaceController(testing: .init(), sink: { _, _ in true })
+    check(ctl2.readMeters() == nil, "no sink -> nil")
+    ctl2.readBlockSink = { $0 == HardwareMeters.address ? block : nil }
+    let got = ctl2.readMeters()
+    check(got != nil && got!.physIn[0] == 0.0, "readMeters decodes sink block")
+    ctl2.readBlockSink = { _ in Data(count: 10) }
+    check(ctl2.readMeters() == nil, "short sink block -> nil")
+}
 print("\(checks - failures)/\(checks) checks passed")
 try? FileManager.default.removeItem(atPath: testStateDir)
 exit(failures == 0 ? 0 : 1)

@@ -19,6 +19,9 @@ public final class FirefaceController {
     /// When set, register writes go to this sink instead of the user client
     /// (unit tests / dry runs).
     public var writeSink: ((UInt32, UInt32) -> Bool)?
+    /// When set, block reads come from this sink instead of the user
+    /// client (tests inject a fake meter block here).
+    public var readBlockSink: ((UInt32) -> Data?)?
 
     public init(client: ASFWClient? = nil, state: MixerState = .load()) throws {
         self.client = try client ?? ASFWClient()
@@ -132,6 +135,30 @@ public final class FirefaceController {
     /// Replace the tracked state (e.g. after loading a snapshot).
     /// Call `applyAll()` afterwards to push it to the hardware.
     public func restoreState(_ newState: MixerState) { state = newState }
+
+    // MARK: - Hardware meters
+
+    /// Read the meter block at `0x80100000` — one 648-byte block read
+    /// returning all 54 channel levels. Call it on the serial hw queue so
+    /// it never overlaps a write; a healthy bus answers in ~2-5 ms, so the
+    /// short timeout only bites when the driver is wedged.
+    public func readMeters(timeoutMs: Int = 40) -> MeterLevels? {
+        if let sink = readBlockSink {
+            return sink(HardwareMeters.address).flatMap(HardwareMeters.parse)
+        }
+        guard let client else { return nil }
+        for (conn, handle) in client.asyncBlockRead(destinationID: nodeID,
+                                                  addressHigh: 0,
+                                                  addressLow: HardwareMeters.address,
+                                                  length: UInt32(HardwareMeters.blockSize)) {
+            if let r = client.awaitResult(handle: handle, onConnection: conn,
+                                          timeoutMs: timeoutMs),
+               r.status == 0, let m = HardwareMeters.parse(r.data) {
+                return m
+            }
+        }
+        return nil
+    }
 }
 
 // MARK: - Device config block (phantom, pads, levels, clock)

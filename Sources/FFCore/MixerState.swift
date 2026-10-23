@@ -2,10 +2,9 @@ import Foundation
 
 /// Persisted view of the FF400's live mixer RAM.
 ///
-/// The device's mixer cells are effectively write-only through the ASFW
-/// user client (AR responses never reach user-space transactions on the
-/// current build), so — like FFADO — we track the state we wrote and
-/// re-apply it on demand.
+/// The device's mixer cells are write-only in hardware — reads ack but
+/// return filler (`0xffffffff`) — so — like FFADO — we track the state we
+/// wrote and re-apply it on demand.
 public struct MixerState: Codable, Equatable {
     /// Input → output fader gains, row-major [dest][src] order:
     /// index = src * 18 + dest... documented below as src*18+dest.

@@ -14,6 +14,12 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   failure
 
 ### Added
+- Hardware meters: the FF400's meter block (`0x80100000`, one 648-byte
+  block read) decodes into 54 channel levels (phys-in / stream / phys-out,
+  −90.03…0 dBFS + overload flag). `ffctl meters` dumps them; FFTray shows
+  a live bar beside every input, output and preamp fader at ~12 Hz —
+  one read per tick on the hw queue (never a backlog; "Meters" footer
+  toggle disables polling entirely)
 - End-to-end tests: `make e2e` drives the real `ffctl` binary against a
   fake device (`FFCTL_FAKE_HW`/`FFCTL_STATE_DIR`/`FFCTL_FAKE_FAIL` env
   vars — also a usable dry-run mode) in CI; `make hwtest` runs an

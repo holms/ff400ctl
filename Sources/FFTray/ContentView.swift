@@ -75,11 +75,50 @@ struct EditableValue: View {
     }
 }
 
-/// One vertical fader column: travel slider + name + editable value.
-/// During a drag the slider position lives in `live` (view-local), so a
-/// fast drag doesn't republish the model and re-render the whole panel
-/// per tick; `onLive` still fires a coalesced hardware preview write.
-/// The model is committed once, on release, through `value`'s setter.
+/// One channel's live level for the bar next to a fader.
+struct MeterBarData {
+    let db: Double
+    let clip: Bool
+}
+
+/// Slim vertical level bar: -60..0 dBFS, green→yellow→red, red cap on
+/// overload (device clip flag or a nearly-full reading).
+struct MeterBar: View {
+    let data: MeterBarData
+    private static let span: Double = 60
+
+    var body: some View {
+        GeometryReader { g in
+            let h = g.size.height
+            let frac = data.db.isFinite
+                ? min(1, max(0, (data.db + Self.span) / Self.span)) : 0
+            ZStack {
+                RoundedRectangle(cornerRadius: 2).fill(Theme.offCell)
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: [.green, .yellow, .red],
+                                             startPoint: .bottom, endPoint: .top))
+                        .frame(height: frac * h)
+                }
+                if data.clip || data.db > -1 {
+                    VStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 1).fill(Color.red)
+                            .frame(height: 3)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One vertical fader column: meter bar(s) + travel slider + name +
+/// editable value. During a drag the slider position lives in `live`
+/// (view-local), so a fast drag doesn't republish the model and
+/// re-render the whole panel per tick; `onLive` still fires a coalesced
+/// hardware preview write. The model is committed once, on release,
+/// through `value`'s setter.
 struct VFader: View {
     let title: String
     @Binding var value: Double
@@ -89,7 +128,13 @@ struct VFader: View {
     let onLive: (Double) -> Void
     let onText: (String) -> Void
     var colWidth: CGFloat = faderColW
+    /// 0–2 live meter bars drawn beside the slider.
+    var meters: [MeterBarData] = []
     @State private var live: Double?
+
+    private var meterWidth: CGFloat {
+        meters.isEmpty ? 0 : CGFloat(meters.count) * 5 + 4
+    }
 
     private var dragBinding: Binding<Double> {
         Binding(get: { live ?? value }, set: { live = $0; onLive($0) })
@@ -101,27 +146,34 @@ struct VFader: View {
 
     var body: some View {
         VStack(spacing: 3) {
-            ZStack {
-                if let step {
-                    Slider(value: dragBinding, in: range, step: step,
-                           onEditingChanged: commit)
-                } else {
-                    Slider(value: dragBinding, in: range,
-                           onEditingChanged: commit)
+            HStack(spacing: 4) {
+                ForEach(Array(meters.enumerated()), id: \.offset) { _, m in
+                    MeterBar(data: m).frame(width: 5, height: faderTravel)
                 }
+                ZStack {
+                    if let step {
+                        Slider(value: dragBinding, in: range, step: step,
+                               onEditingChanged: commit)
+                    } else {
+                        Slider(value: dragBinding, in: range,
+                               onEditingChanged: commit)
+                    }
+                }
+                .frame(width: faderTravel)
+                .rotationEffect(.degrees(-90))
+                .frame(width: colWidth - 6, height: faderTravel)
             }
-            .frame(width: faderTravel)
-            .rotationEffect(.degrees(-90))
-            .frame(width: colWidth - 6, height: faderTravel)
 
             Text(title)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .padding(.leading, meterWidth)
             EditableValue(text: format(live ?? value), width: colWidth - 2, onCommit: onText)
+                .padding(.leading, meterWidth)
         }
-        .frame(width: colWidth)
+        .frame(width: colWidth + meterWidth)
     }
 }
 
@@ -265,7 +317,9 @@ struct ContentView: View {
                                 if let db = parseDB(t) {
                                     model.setInputSend(src, gain: Fireface400.gain(fromDB: db))
                                 }
-                            })
+                            },
+                            meters: [MeterBarData(db: model.meters.physIn[src],
+                                                  clip: model.meters.physInClip[src])])
                         VStack(spacing: 3) {
                             FlagButton("M", on: model.inputMute[src], color: .orange) {
                                 model.setInputMute(src, on: !model.inputMute[src])
@@ -306,7 +360,9 @@ struct ContentView: View {
                     if let db = parseDB(t) {
                         model.setOutput(ch, gain: Fireface400.gain(fromDB: db))
                     }
-                })
+                },
+                meters: [MeterBarData(db: model.meters.physOut[ch],
+                                      clip: model.meters.physOutClip[ch])])
             FlagButton("M", on: model.outputMute[ch], color: .orange) {
                 model.setOutputMute(ch, on: !model.outputMute[ch])
             }
@@ -339,7 +395,13 @@ struct ContentView: View {
                                             if let db = parseDB(t) {
                                                 model.setOutput(l, gain: Fireface400.gain(fromDB: db))
                                             }
-                                        })
+                                        },
+                                        meters: [
+                                            MeterBarData(db: model.meters.physOut[l],
+                                                         clip: model.meters.physOutClip[l]),
+                                            MeterBarData(db: model.meters.physOut[r],
+                                                         clip: model.meters.physOutClip[r]),
+                                        ])
                                     HStack(spacing: 2) {
                                         FlagButton("M", on: model.outputMute[l], color: .orange) {
                                             model.setOutputMute(l, on: !model.outputMute[l])
@@ -388,7 +450,9 @@ struct ContentView: View {
                             format: { String(format: "%.0f dB", $0) },
                             onLive: { model.previewMicGain(i, dB: $0) },
                             onText: { t in if let db = parseDB(t) { model.setMicGain(i, dB: db) } },
-                            colWidth: 64)
+                            colWidth: 64,
+                            meters: [MeterBarData(db: model.meters.physIn[i],
+                                                  clip: model.meters.physInClip[i])])
                         FlagButton("48V", on: model.phantom[i], color: .yellow) {
                             model.setPhantom(i, on: !model.phantom[i])
                         }
@@ -406,7 +470,9 @@ struct ContentView: View {
                             format: { String(format: "%.1f dB", $0) },
                             onLive: { model.previewInGain(i, dB: $0) },
                             onText: { t in if let db = parseDB(t) { model.setInGain(i, dB: db) } },
-                            colWidth: 64)
+                            colWidth: 64,
+                            meters: [MeterBarData(db: model.meters.physIn[i + 2],
+                                                  clip: model.meters.physInClip[i + 2])])
                         HStack(spacing: 2) {
                             FlagButton("PAD", on: model.pad[i], color: .orange) {
                                 model.setPad(i, on: !model.pad[i])
@@ -437,6 +503,8 @@ struct ContentView: View {
                 }
             }
             HStack(spacing: 12) {
+                Toggle("Meters", isOn: $model.metersOn)
+                    .toggleStyle(.checkbox)
                 Toggle("Auto re-apply after power cycle", isOn: $model.autoReapply)
                     .toggleStyle(.checkbox)
                 Toggle("Launch at login", isOn: Binding(

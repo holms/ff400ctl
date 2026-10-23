@@ -29,6 +29,7 @@ func usage(_ code: Int32 = 2) -> Never {
       ffctl mute-all               zero every input -> output fader
       ffctl apply                  re-write entire saved mixer state
       ffctl state [--json]         print tracked mixer state summary
+      ffctl meters                 dump hardware meter levels (block read 0x80100000)
       ffctl --version              print version
 
     Automation:
@@ -77,6 +78,22 @@ if let fakeLog = ProcessInfo.processInfo.environment["FFCTL_FAKE_HW"], !fakeLog.
     ctl = FirefaceController(testing: .load()) { addr, value in
         fh?.write(String(format: "%08x %08x\n", addr, value).data(using: .utf8)!)
         return !fail
+    }
+    // Fake device serves a deterministic meter block so `ffctl meters`
+    // works in dry runs: phys-in 1 at 0 dB clipping, stream 1 at -6 dB,
+    // out 1 at -3.5 dB (raw quadlets are linear amplitude).
+    ctl.readBlockSink = { addr in
+        guard addr == HardwareMeters.address else { return nil }
+        var block = Data(count: HardwareMeters.blockSize)
+        func put(_ ch: Int, _ group: Int, _ raw: UInt32) {
+            let pos = 432 + (group * 18 + ch) * 4
+            block[pos] = UInt8(raw & 0xff); block[pos+1] = UInt8(raw >> 8 & 0xff)
+            block[pos+2] = UInt8(raw >> 16 & 0xff); block[pos+3] = UInt8(raw >> 24)
+        }
+        put(0, 0, 0x7fff_ff01)   // phys-in 1: 0 dB + clip flag
+        put(0, 1, 0x3fff_ff00)   // stream 1: ~-6 dB
+        put(0, 2, 0x5555_5500)   // phys-out 1: ~-3.5 dB
+        return block
     }
 } else {
     do {
@@ -227,6 +244,18 @@ func run(_ a: ArraySlice<String>, _ ctl: FirefaceController) -> Int32 {
             print(String(format: "  pb%d -> out%d = 0x%05x", i/18, i%18, s.playback[i])); n += 1
         }
         print("tracked non-zero cells: \(n); ampGains: \(s.ampGains)")
+    case "meters":
+        guard let m = ctl.readMeters() else {
+            print("FAILED: meter read (device off or driver stalled)")
+            return 1
+        }
+        func fmt(_ v: Double) -> String { v.isFinite ? String(format: "%6.1f", v) : "   -∞" }
+        func row(_ label: String, _ levels: [Double], _ clip: [Bool]) {
+            print(label + " " + levels.enumerated().map { fmt($1) + (clip[$0] ? "!" : " ") }.joined())
+        }
+        row("phys-in :", m.physIn, m.physInClip)
+        row("stream  :", m.streamIn, [Bool](repeating: false, count: 18))
+        row("phys-out:", m.physOut, m.physOutClip)
     case "save":
         guard a.count > 1 else { usage() }
         ctl.saveState()

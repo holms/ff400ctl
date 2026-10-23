@@ -180,15 +180,17 @@ status listener, selector 10).
 
 ### Known limitations / notes for the ASFW author
 
-- **Reads don't complete.** User-client async *reads* issue fine but the
-  AR response never gets matched (`AwaitingAR → TimedOut`), while
-  driver-internal reads work. Writes only need the ack, so they land
-  reliably (`ackComplete`) — which is why this tool is write-oriented and
-  tracks mixer state in software, like FFADO's GUI does. Fixing this
-  would also unlock **hardware meters**: per Takashi Sakamoto's ALSA
-  `firewire-fireface-protocols`, the FF400 exposes a ~648-byte level
-  block at `0x80100000` (inputs/stream/outputs, −90…0 dBFS, step 0x100,
-  overload bits) via one block read.
+- **Mixer RAM is write-only in hardware.** User-client async reads work
+  fine — the device acks every read — but mixer cells (`0x80080000`) and
+  the config register (`0x80100514`) return filler (`0xffffffff` / `0`)
+  no matter what was written; the RAM simply offers no read-back. So this
+  tool tracks mixer state in software, like FFADO's GUI does. Readable
+  regions: Config ROM, status `0x801c0000`, revision `0x80100290`, flash
+  status `0x80100520` — and the **meter block** `0x80100000`, a ~648-byte
+  block read returning all 54 channel levels (inputs/stream/outputs,
+  −90.03…0 dBFS, mask `0x7fffff00`, overload in the low byte) per
+  Takashi Sakamoto's ALSA `firewire-fireface-protocols`. `ffctl meters`
+  and the FFTray fader bars use it.
 - **Multiple OHCI services** are possible; `ffctl`/`FFTray` write on every
   `ASFWDriver` connection and treat the write as applied if any
   transaction completes. The stray writes on the wrong bus fail with

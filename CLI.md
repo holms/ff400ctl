@@ -74,6 +74,9 @@ ffctl mainmute <on|off> [p]  # mute/unmute a whole stereo pair
 ffctl 1to1                   # restore playback i -> out i at 0 dB
 ffctl mute-all               # zero every input -> output fader cell
 ffctl apply                  # re-write the entire tracked state to hardware
+ffctl meters                 # dump hardware meter levels (block read 0x80100000):
+                             # phys-in / stream-in / phys-out, 18 channels each,
+                             # "!" = device overload flag
 ```
 
 The matrix is 18×18 for inputs and 18×18 for playback. `pb` cells carry

@@ -18,10 +18,11 @@ actions via `MixerModel(testing:)` in the `FFModel` target.
 
 `make hwtest` additionally proves the real user-client path works on
 your machine and that a write transaction completes. It cannot read the
-mixer back — the RAM is write-only through ASFW (user-client async
-reads never complete), so "the device now holds X" stays unverifiable
-until that's fixed upstream. All writes are of *tracked* cell values,
-so the mix only changes if the device's RAM drifted. Options:
+mixer back — the device acks those reads but returns filler (the RAM is
+write-only *in hardware*), so "the device now holds X" stays unverifiable
+by transaction. `HWTEST_LEVEL=1` bridges that gap by measuring actual
+audio. All writes are of *tracked* cell values, so the mix only changes
+if the device's RAM drifted. Options:
 
 - `HWTEST_APPLY=1` — additionally run a full `ffctl apply` (~700 writes)
 - `HWTEST_AUDIO=1` — interactive: plays a 440 Hz tone through the FF400

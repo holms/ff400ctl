@@ -145,6 +145,13 @@ run mono on
 expect_rc 0 "mono exit"
 expect_state monoBus "" "True" "mono flag"
 
+# meters: fake device serves a deterministic block
+run meters
+expect_rc 0 "meters exit"
+expect_out "phys-in :" "meters prints phys-in row"
+expect_out "phys-out:" "meters prints phys-out row"
+expect_out "0.0!" "meters shows 0 dB + clip flag on ch 1"
+
 # snapshots round-trip through the filesystem
 run save e2esnap
 expect_rc 0 "save exit"

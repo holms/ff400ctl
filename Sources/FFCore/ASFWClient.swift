@@ -116,6 +116,27 @@ public final class ASFWClient {
                  addressHigh: addressHigh, addressLow: addressLow, payload: payload)
     }
 
+    /// Issue an async *block* read (selector 44) — one transaction fetching
+    /// `length` bytes, e.g. the FF400's 648-byte meter block.
+    @discardableResult
+    public func asyncBlockRead(destinationID: UInt16, addressHigh: UInt16,
+                               addressLow: UInt32, length: UInt32) -> [Int: UInt16] {
+        var scalars: [UInt64] = [UInt64(destinationID), UInt64(addressHigh),
+                                 UInt64(addressLow), UInt64(length)]
+        var handles: [Int: UInt16] = [:]
+        for (i, conn) in connections.enumerated() {
+            var out: UInt64 = 0
+            var outCount: UInt32 = 1
+            let kr = scalars.withUnsafeMutableBufferPointer { s in
+                IOConnectCallMethod(conn, Method.asyncBlockRead.rawValue,
+                                    s.baseAddress, 4, nil, 0,
+                                    &out, &outCount, nil, nil)
+            }
+            if kr == KERN_SUCCESS { handles[i] = UInt16(truncatingIfNeeded: out) }
+        }
+        return handles
+    }
+
     private func rawWrite(selector: Method, destinationID: UInt16, addressHigh: UInt16,
                           addressLow: UInt32, payload: Data) -> [Int: UInt16] {
         var scalars: [UInt64] = [UInt64(destinationID), UInt64(addressHigh),
@@ -143,7 +164,7 @@ public final class ASFWClient {
         var scalarIn: [UInt64] = [UInt64(handle)]
         var scalarOut: [UInt64] = [0, 0, 0]
         var scalarOutCount: UInt32 = 3
-        var payload = Data(count: 512)
+        var payload = Data(count: 2048)
         var payloadSize = payload.count
         let kr = payload.withUnsafeMutableBytes { p in
             scalarIn.withUnsafeMutableBufferPointer { si in

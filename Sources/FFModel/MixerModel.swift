@@ -45,6 +45,18 @@ public final class MixerModel: NSObject, ObservableObject {
         UserDefaults.standard.object(forKey: "autoReapply") as? Bool ?? true {
         didSet { UserDefaults.standard.set(autoReapply, forKey: "autoReapply") }
     }
+    /// Live hardware levels read from the meter block (~12 Hz).
+    /// All -inf when disconnected, stalled, or `metersOn` is off.
+    @Published public var meters = MeterLevels()
+    /// Poll the hardware meter block. Off = zero FireWire traffic for
+    /// users who'd rather not have the 648-byte read every 80 ms.
+    @Published public var metersOn =
+        UserDefaults.standard.object(forKey: "metersOn") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(metersOn, forKey: "metersOn")
+            if metersOn { startMeterTimer() } else { stopMeterTimer() }
+        }
+    }
 
     /// Read and reassigned ONLY on the hw queue (init/adopt run before
     /// any queue use); main-thread code must gate on `connected`.
@@ -66,6 +78,10 @@ public final class MixerModel: NSObject, ObservableObject {
     /// Called to open the persistent detached window (implemented by the
     /// app's DetachWindowController).
     public var onOpenDetached: (() -> Void)?
+    private var meterTimer: DispatchSourceTimer?
+    /// Consecutive failed meter reads; hitting the limit parks the timer
+    /// until the next connect.
+    private var meterMisses = 0
 
     /// Production init — connect to ASFW and watch the state file.
     /// The app additionally wires the CoreAudio presence watcher.
@@ -103,6 +119,45 @@ public final class MixerModel: NSObject, ObservableObject {
         c.busPair = (p.a, p.b)
         publish(c.state)
         lastSaved = c.state
+        // Meters only exist on a real client (or an injected read sink).
+        meterMisses = 0
+        if metersOn && (c.client != nil || c.readBlockSink != nil) {
+            startMeterTimer()
+        }
+    }
+
+    // MARK: - Hardware meters
+
+    /// 80 ms ≈ TotalMix-ish responsiveness; each tick is one 648-byte
+    /// block read submitted under the coalescing key "meter", so a busy
+    /// hw queue collapses ticks instead of queueing a read backlog —
+    /// meter polls can never starve a fader drag.
+    private func startMeterTimer() {
+        guard meterTimer == nil else { return }
+        let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        t.schedule(deadline: .now() + 0.1, repeating: .milliseconds(80))
+        t.setEventHandler { [weak self] in self?.meterTick() }
+        meterTimer = t
+        t.resume()
+    }
+
+    private func stopMeterTimer() {
+        meterTimer?.cancel()
+        meterTimer = nil
+        DispatchQueue.main.async { [weak self] in self?.meters = MeterLevels() }
+    }
+
+    private func meterTick() {
+        hwq.submit("meter") { [weak self] in
+            guard let self, let c = self.ctl else { return }
+            if let m = c.readMeters() {
+                self.meterMisses = 0
+                DispatchQueue.main.async { self.meters = m }
+            } else {
+                self.meterMisses += 1
+                if self.meterMisses >= 8 { self.stopMeterTimer() }
+            }
+        }
     }
 
     /// Persist state now (app termination). The save goes through the hw
