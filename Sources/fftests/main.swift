@@ -685,6 +685,46 @@ do {
     eq(last(Fireface400.mixAddress(kind: .playback, src: 0, dest: 0)!)!,
        avg, "UI mono averages playback (default 1:1 unity -> 0x4000)")
 
+    // playback matrix toggle flips the cell on/off
+    let m7 = makeModel()
+    _ = { w.removeAll() }()
+    m7.togglePlayback(src: 2, dest: 5)
+    m7.flush()
+    eq(last(Fireface400.mixAddress(kind: .playback, src: 2, dest: 5)!)!,
+       0x8000, "UI pb toggle on")
+    m7.togglePlayback(src: 2, dest: 5)
+    m7.flush()
+    eq(last(Fireface400.mixAddress(kind: .playback, src: 2, dest: 5)!)!,
+       0, "UI pb toggle off")
+
+    // instr chips: model maps i -> setInstrument(ch: i+2); q0 bits
+    let m8 = makeModel()
+    _ = { w.removeAll() }()
+    m8.setInstr(0, on: true)
+    m8.flush()
+    check(w.filter { $0.0 == Fireface400.configReg }.last!.1 & 0x200 != 0,
+          "UI instr3 sets config q0 bit 0x200")
+    m8.setInstr(1, on: true)
+    m8.flush()
+    check(w.filter { $0.0 == Fireface400.configReg }.last!.1 & 0x04 != 0,
+          "UI instr4 sets config q0 bit 0x04")
+
+    // drag previews + the commit coalesce into ONE write on the same key
+    let m9 = makeModel()
+    let started = DispatchSemaphore(value: 0)
+    let gate = DispatchSemaphore(value: 0)
+    m9.hwq.submit("block") { started.signal(); _ = gate.wait(timeout: .now() + 10) }
+    check(started.wait(timeout: .now() + 2) == .success, "queue blocked")
+    _ = { w.removeAll() }()
+    m9.previewOutput(0, gain: 0x1000)
+    m9.previewOutput(0, gain: 0x2000)
+    m9.setOutput(0, gain: 0x3000)
+    gate.signal()
+    m9.flush()
+    let outWrites = w.filter { $0.0 == 0x8008_0f80 }
+    eq(outWrites.count, 1, "preview+commit coalesced to one fader write")
+    eq(outWrites.first?.1 ?? 0, 0x3000, "coalesced write carries the commit gain")
+
     // disconnected model: action sets lastError, emits no writes
     let md = MixerModel(testing: nil)
     _ = { w.removeAll() }()
@@ -738,6 +778,13 @@ do {
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
     }
     eq(fires, 1, "burst of writes -> one debounced callback")
+    // keep pumping past the debounce window — a double-fire would only
+    // show up after the loop above already exited
+    let settle = Date().addingTimeInterval(0.4)
+    while Date() < settle {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+    eq(fires, 1, "burst produced exactly one callback")
 }
 
 // MARK: - Version

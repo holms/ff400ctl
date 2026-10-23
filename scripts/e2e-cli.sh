@@ -36,6 +36,14 @@ expect_rc()   { [ "$RC" -eq "$1" ] && ok || bad "$2 — exit $RC, want $1"; }
 expect_out()  { echo "$OUT" | grep -qF "$1" && ok || bad "$2 — stdout missing '$1'"; }
 expect_log()  { grep -qF "$1" "$FFCTL_FAKE_HW" && ok || bad "$2 — write log missing '$1'"; }
 
+# expect_last <addr8hex> <val8hex> <name> — assert the LAST write to an
+# address, not just that some write contained the value
+expect_last() {
+    local got
+    got=$(grep -i "^$1 " "$FFCTL_FAKE_HW" | tail -1 | awk '{print tolower($2)}')
+    [ "$got" = "$2" ] && ok || bad "$3 — last write to $1 = '$got', want $2"
+}
+
 # jget <key> [index] — pull a value out of `state --json`
 jget() {
     "$BIN" state --json | python3 -c "
@@ -143,6 +151,35 @@ expect_rc 0 "save exit"
 run snaps
 expect_out "e2esnap" "snaps lists"
 run mono off
+
+# flag toggles must produce the right CELL writes, not just state flips.
+# Input cell address = 0x80080000 + dest*0x90 + src*4.
+run mix 5 0 0x8000          # tracked cell set while mute5 is still on
+run mute 5 on
+expect_last 80080014 00000000 "mute 5 zeroes in5->out0"
+run mute 5 off
+expect_last 80080014 00008000 "unmute 5 restores in5->out0"
+
+run mix 3 0 0x8000
+run phase 3 on
+expect_last 8008000c ffff8000 "phase 3 writes negative gain"
+
+# with in5->out0 = 0x8000 and unmuted, an unrelated solo silences it
+run solo 2 on
+expect_last 80080014 00000000 "solo 2 silences in5->out0"
+run solo 2 off
+expect_last 80080014 00008000 "unsolo restores in5->out0"
+
+# mono sums the bus pair to (L+R)/2 non-destructively
+run mix 6 0 0x8000
+run mix 6 1 0
+run mono on
+expect_last 80080018 00004000 "mono averages in6->out0"
+expect_last 800800a8 00004000 "mono averages in6->out1"
+run mono off
+expect_last 80080018 00008000 "mono off restores in6->out0"
+expect_last 800800a8 00000000 "mono off restores in6->out1"
+
 run load e2esnap
 expect_rc 0 "load exit"
 expect_state monoBus "" "True" "load restores snapshotted state"
