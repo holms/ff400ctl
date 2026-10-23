@@ -20,7 +20,13 @@ actions via `MixerModel(testing:)` in the `FFModel` target.
 your machine and that a write transaction completes. It cannot read the
 mixer back — the RAM is write-only through ASFW (user-client async
 reads never complete), so "the device now holds X" stays unverifiable
-until that's fixed upstream.
+until that's fixed upstream. All writes are of *tracked* cell values,
+so the mix only changes if the device's RAM drifted. Options:
+
+- `HWTEST_APPLY=1` — additionally run a full `ffctl apply` (~700 writes)
+- `HWTEST_AUDIO=1` — interactive: plays a 440 Hz tone through the FF400
+  and asks you to confirm mute/unmute actually worked
+- `HWTEST_PAIR=n` — output pair for the audio test (default 0 = AN1/2)
 
 ## House rules
 

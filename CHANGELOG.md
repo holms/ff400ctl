@@ -14,6 +14,9 @@ All notable changes to ff400ctl. Format follows [Keep a Changelog](https://keepa
   fake device (`FFCTL_FAKE_HW`/`FFCTL_STATE_DIR`/`FFCTL_FAKE_FAIL` env
   vars — also a usable dry-run mode) in CI; `make hwtest` runs an
   opt-in hardware smoke test (connect + completed write transaction)
+- hwtest: 8-cell back-to-back write burst (catches intermittent
+  transaction drops); `HWTEST_AUDIO=1` runs an interactive 440 Hz tone
+  mute/unmute check on pair `HWTEST_PAIR` (default AN1/2)
 - `MixerModel` extracted into an `FFModel` target with an injectable
   controller — UI actions (sends, MAIN, ST links, matrix, preamp chips,
   bus/solo, mono, disconnected errors) are now covered by fftests
